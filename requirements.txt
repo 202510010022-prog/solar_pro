@@ -1,0 +1,7 @@
+pyinstaller
+PySide6
+Pillow
+matplotlib
+reportlab
+pdfplumber
+pandas

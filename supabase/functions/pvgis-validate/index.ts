@@ -1,0 +1,362 @@
+// Restrict CORS to known domains (S2.1)
+const allowedOrigins = [
+  "https://solarpro.app",
+  "https://admin.solarpro.app",
+  "http://localhost:3000",
+  "http://localhost:8081",
+];
+
+function getCorsHeaders(origin?: string): Record<string, string> {
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : "null";
+  return {
+    "Access-Control-Allow-Origin": corsOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
+const corsHeaders = getCorsHeaders();
+
+type PvgisPayload = {
+  mode?: string;
+  latitude?: number | string;
+  longitude?: number | string;
+  address?: {
+    zip_code?: string;
+    street?: string;
+    address_number?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  };
+  installed_power_kwp?: number | string;
+  estimated_annual_generation?: number | string;
+  system_loss_percent?: number | string;
+};
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") return jsonResponse({ ok: true });
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Metodo nao permitido." }, 405);
+  }
+
+  try {
+    const token = bearerToken(request);
+    if (!token) return jsonResponse({ error: "Token de acesso ausente." }, 401);
+
+    const payload = (await request.json().catch(() => ({}))) as PvgisPayload;
+    const location = await resolveLocation(payload);
+    if ("error" in location) return jsonResponse({ error: location.error }, 400);
+
+    const latitude = location.latitude;
+    const longitude = location.longitude;
+    const installedPower = toNumber(payload.installed_power_kwp);
+    const estimatedAnnual = toNumber(payload.estimated_annual_generation);
+    const loss = toNumber(payload.system_loss_percent ?? 14);
+    const mode = `${payload.mode || "validate"}`.trim();
+
+    const validation = validatePayload(latitude, longitude, installedPower);
+    if (validation) return jsonResponse({ error: validation }, 400);
+
+    const pvgisResult = await fetchPvgis({
+      latitude,
+      longitude,
+      installedPower,
+      loss,
+    });
+    if ("error" in pvgisResult) {
+      return jsonResponse({ error: pvgisResult.error }, 502);
+    }
+
+    const data = pvgisResult.data;
+    const monthly = data?.outputs?.monthly?.fixed;
+    if (!Array.isArray(monthly) || monthly.length < 12) {
+      return jsonResponse({ error: "PVGIS retornou dados incompletos." }, 502);
+    }
+
+    const monthlyGenerations = monthly
+      .slice(0, 12)
+      .map((item) => toNumber(item?.E_m))
+      .filter((value) => value > 0);
+    if (monthlyGenerations.length < 12) {
+      return jsonResponse({ error: "PVGIS retornou valores mensais invalidos." }, 502);
+    }
+    const monthlyHsp = monthly
+      .slice(0, 12)
+      .map((item) => toNumber(item?.["H(i)_d"]))
+      .filter((value) => value > 0);
+    if (monthlyHsp.length < 12) {
+      return jsonResponse({ error: "PVGIS retornou HSP mensal incompleto." }, 502);
+    }
+
+    const pvgisAnnual = monthlyGenerations.reduce((sum, value) => sum + value, 0);
+    const base = Math.max(estimatedAnnual, 1);
+    const differencePercent = ((pvgisAnnual - estimatedAnnual) / base) * 100;
+
+    return jsonResponse({
+      ok: true,
+      mode,
+      estimated_annual_generation: estimatedAnnual,
+      pvgis_annual_generation: pvgisAnnual,
+      monthly_generations: monthlyGenerations,
+      monthly_hsp: monthlyHsp,
+      difference_percent: differencePercent,
+      latitude,
+      longitude,
+      location_source: location.source,
+      location_label: location.label,
+    });
+  } catch (error) {
+    return jsonResponse(
+      { error: "Nao foi possivel validar com PVGIS." },
+      500,
+    );
+  }
+});
+
+async function fetchPvgis(options: {
+  latitude: number;
+  longitude: number;
+  installedPower: number;
+  loss: number;
+}) {
+  const baseParams = {
+    lat: options.latitude.toFixed(6),
+    lon: options.longitude.toFixed(6),
+    peakpower: options.installedPower.toFixed(4),
+    loss: options.loss.toFixed(2),
+    pvtechchoice: "crystSi",
+    mountingplace: "free",
+    angle: "10",
+    aspect: "0",
+    outputformat: "json",
+  };
+  const databases = ["", "PVGIS-SARAH3", "PVGIS-NSRDB", "PVGIS-ERA5"];
+  const errors: string[] = [];
+
+  for (const database of databases) {
+    const params = new URLSearchParams(baseParams);
+    if (database) params.set("raddatabase", database);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // S1.1: Reduced timeout from 20s
+    try {
+      const response = await fetch(
+        `https://re.jrc.ec.europa.eu/api/v5_3/PVcalc?${params.toString()}`,
+        { signal: controller.signal },
+      );
+      const rawText = await response.text();
+      if (response.ok) {
+        return { data: JSON.parse(rawText) };
+      }
+      errors.push(
+        `${database || "auto"}: ${response.status} ${extractPvgisMessage(rawText)}`,
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        errors.push(`${database || "auto"}: tempo excedido`);
+      } else {
+        errors.push(
+          `${database || "auto"}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return {
+    error:
+      `PVGIS recusou a consulta para as coordenadas ${options.latitude.toFixed(5)}, ${options.longitude.toFixed(5)}. ` +
+      errors.filter(Boolean).join(" | "),
+  };
+}
+
+async function resolveLocation(payload: PvgisPayload) {
+  const latitude = toNumber(payload.latitude);
+  const longitude = toNumber(payload.longitude);
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return {
+      latitude,
+      longitude,
+      source: "current_location",
+      label: "Localização atual",
+    };
+  }
+
+  const queries = addressQueries(payload.address);
+  if (queries.length === 0) {
+    return {
+      error:
+        "Endereço do cliente incompleto. Cadastre pelo menos CEP, cidade e estado do cliente.",
+    };
+  }
+
+  let lastError = "";
+  for (const query of queries) {
+    const result = await geocode(query);
+    if ("error" in result) {
+      lastError = result.error;
+      continue;
+    }
+    return result;
+  }
+
+  return {
+    error:
+      lastError ||
+      "Não encontramos coordenadas para o endereço do cliente. Confira CEP, cidade e estado.",
+  };
+}
+
+async function geocode(query: string) {
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    q: query,
+    limit: "1",
+    countrycodes: "br",
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+      {
+        headers: {
+          "Accept": "application/json",
+          "User-Agent": "SolarPro/0.1 contato@solarpro.local",
+        },
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) {
+      return { error: `Geocodificação retornou erro ${response.status}.` };
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      return { error: "" };
+    }
+
+    const latitude = toNumber(data[0]?.lat);
+    const longitude = toNumber(data[0]?.lon);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return { error: "Geocodificação retornou coordenadas inválidas." };
+    }
+
+    return {
+      latitude,
+      longitude,
+      source: "client_address",
+      label: `${data[0]?.display_name || query}`,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { error: "Geocodificação demorou demais para responder." };
+    }
+    return {
+      error: error instanceof Error
+        ? `Falha na geocodificação: ${error.message}`
+        : "Falha na geocodificação.",
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function addressQueries(address?: PvgisPayload["address"]) {
+  if (!address) return [];
+  const street = clean(address.street);
+  const number = clean(address.address_number);
+  const neighborhood = clean(address.neighborhood);
+  const city = clean(address.city);
+  const state = clean(address.state);
+  const zip = onlyDigits(address.zip_code);
+  const streetNumber = [street, number].filter(Boolean).join(", ");
+  const queries = [
+    joinQuery([streetNumber, neighborhood, city, state, zip, "Brasil"]),
+    joinQuery([streetNumber, city, state, "Brasil"]),
+    joinQuery([neighborhood, city, state, "Brasil"]),
+    joinQuery([zip, city, state, "Brasil"]),
+    joinQuery([city, state, "Brasil"]),
+    joinQuery([zip, "Brasil"]),
+  ].filter(Boolean);
+
+  return [...new Set(queries)];
+}
+
+function joinQuery(parts: string[]) {
+  return parts.map(clean).filter(Boolean).join(", ");
+}
+
+function clean(value: unknown) {
+  return `${value ?? ""}`.trim().replace(/\s+/g, " ");
+}
+
+function onlyDigits(value: unknown) {
+  return clean(value).replace(/\D/g, "");
+}
+
+function extractPvgisMessage(rawText: string) {
+  const text = `${rawText || ""}`.trim();
+  if (!text) return "sem detalhe";
+  try {
+    const data = JSON.parse(text);
+    const message =
+      data?.message || data?.error || data?.detail || data?.description;
+    if (message) return cleanMessage(message);
+  } catch (_) {
+    // PVGIS sometimes returns plain text or HTML for bad requests.
+  }
+  return cleanMessage(text.replace(/<[^>]+>/g, " "));
+}
+
+function cleanMessage(value: unknown) {
+  const text = clean(value);
+  if (text.length <= 160) return text;
+  return `${text.slice(0, 160)}...`;
+}
+
+function validatePayload(
+  latitude: number,
+  longitude: number,
+  installedPower: number,
+) {
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    return "Latitude invalida.";
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return "Longitude invalida.";
+  }
+  if (!Number.isFinite(installedPower) || installedPower <= 0) {
+    return "Potencia instalada invalida.";
+  }
+  return "";
+}
+
+function toNumber(value: unknown) {
+  if (typeof value === "number") return value;
+  if (value === null || value === undefined) return Number.NaN;
+  const normalized = `${value ?? ""}`.trim().replace(",", ".");
+  if (!normalized) return Number.NaN;
+  return Number(normalized);
+}
+
+function bearerToken(request: Request) {
+  const header = request.headers.get("Authorization") || "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ?? "";
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
+}

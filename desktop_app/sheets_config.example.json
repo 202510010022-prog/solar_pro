@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "service_account_file": "service_account.json",
+  "users_spreadsheet_id": "COLE_AQUI_O_ID_DA_PLANILHA_PRIVADA_DE_USUARIOS",
+  "system_spreadsheet_id": "COLE_AQUI_O_ID_DA_PLANILHA_PRINCIPAL_DO_SISTEMA",
+  "users_sheet": "Usuarios",
+  "clients_sheet": "Clientes",
+  "budgets_sheet": "Orcamentos",
+  "history_sheet": "Historico"
+}

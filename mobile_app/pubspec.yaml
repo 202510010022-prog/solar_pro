@@ -1,0 +1,32 @@
+name: solarpro_mobile
+description: Solar Pro mobile app for field CRM, photovoltaic sizing, and project sync.
+publish_to: "none"
+version: 0.1.0+2001
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.3  # CRITICAL: v0.20.3 fixes date/currency formatting
+  shared_preferences: ^2.2.3
+  supabase_flutter: ^2.15.3  # CRITICAL: 2.15.3 has security patches (was 2.5.8)
+  geolocator: ^14.0.2
+  path_provider: ^2.1.5
+  share_plus: ^13.1.0
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  csv: ^8.0.0
+  cross_file: ^0.3.5+2
+  web: ^1.1.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0  # CRITICAL: 6.0.0 has latest lint rules (was 4.0.0)
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

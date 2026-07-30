@@ -1,0 +1,334 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../models/project.dart';
+import '../theme/app_theme.dart';
+import '../widgets/neon_card.dart';
+
+class ProjectDetailsPage extends StatelessWidget {
+  const ProjectDetailsPage({super.key, required this.project});
+
+  final Project project;
+
+  static const months = [
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final money = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    return Scaffold(
+      appBar: AppBar(title: const Text('Detalhes do projeto')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            project.clientName.isEmpty ? 'Cliente sem nome' : project.clientName,
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${project.status} • ${project.projectDate}',
+            style: const TextStyle(color: AppTheme.muted),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _Metric(title: 'Potência', value: '${project.systemPower.toStringAsFixed(2)} kWp'),
+              _Metric(title: 'Módulos', value: '${project.moduleCount}'),
+              _Metric(title: 'Produção anual', value: '${project.annualGeneration.toStringAsFixed(0)} kWh'),
+              _Metric(title: 'Payback', value: '${project.paybackYears.toStringAsFixed(2)} anos'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          NeonCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Resumo financeiro', style: TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 12),
+                _row('Valor do projeto', money.format(project.projectValue)),
+                _row('Mão de obra', money.format(project.laborCost)),
+                _row('Módulos', '${project.moduleCount} x ${money.format(project.moduleUnitCost)}'),
+                _row('Inversor', money.format(project.inverterCost)),
+                _row('Suportes', money.format(project.supportCost)),
+                ...project.extraMaterials.map(
+                  (item) => _row(item.name, money.format(item.value)),
+                ),
+                _divider(),
+                _row('Economia mensal estimada', money.format(project.monthlySavings)),
+                _row('Geração média mensal', '${project.monthlyGeneration.toStringAsFixed(0)} kWh'),
+                _row('Consumo anual', '${project.annualConsumption.toStringAsFixed(0)} kWh'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          NeonCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Geração x consumo', style: TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 12),
+                const Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    _LegendDot(label: 'Consumo', color: AppTheme.orange),
+                    _LegendDot(label: 'Geração', color: AppTheme.primaryBlue),
+                    _LegendDot(label: 'Saldo positivo', color: AppTheme.green),
+                    _LegendDot(label: 'Saldo negativo', color: Colors.redAccent),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ...List.generate(12, (index) {
+                  final consumption = _at(project.monthlyConsumptions, index);
+                  final generation = _at(project.monthlyGenerations, index);
+                  final balance = _at(project.monthlyBalances, index);
+                  return _MonthComparison(
+                    month: months[index],
+                    consumption: consumption,
+                    generation: generation,
+                    balance: balance,
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 360;
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(color: AppTheme.muted)),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 4,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _divider() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        height: 1,
+        color: AppTheme.border,
+      ),
+    );
+  }
+
+  double _at(List<double> values, int index) => index < values.length ? values[index] : 0;
+}
+
+class _MonthComparison extends StatelessWidget {
+  const _MonthComparison({
+    required this.month,
+    required this.consumption,
+    required this.generation,
+    required this.balance,
+  });
+
+  final String month;
+  final double consumption;
+  final double generation;
+  final double balance;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxMain = [consumption, generation, 1.0].reduce((a, b) => a > b ? a : b);
+    final maxBalance = [balance.abs(), maxMain * 0.25, 1.0].reduce((a, b) => a > b ? a : b);
+    final balanceColor = balance >= 0 ? AppTheme.green : Colors.redAccent;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(month, style: const TextStyle(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          _BarRow(
+            label: 'Consumo',
+            valueLabel: '${consumption.toStringAsFixed(0)} kWh',
+            value: consumption,
+            maxValue: maxMain,
+            color: AppTheme.orange,
+          ),
+          const SizedBox(height: 6),
+          _BarRow(
+            label: 'Geração',
+            valueLabel: '${generation.toStringAsFixed(0)} kWh',
+            value: generation,
+            maxValue: maxMain,
+            color: AppTheme.primaryBlue,
+          ),
+          const SizedBox(height: 6),
+          _BarRow(
+            label: 'Saldo',
+            valueLabel: '${balance.toStringAsFixed(0)} kWh',
+            value: balance.abs(),
+            maxValue: maxBalance,
+            color: balanceColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    return SizedBox(
+      width: width > 720 ? 220 : (width - 44) / 2,
+      child: NeonCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: AppTheme.muted)),
+            const SizedBox(height: 6),
+            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BarRow extends StatelessWidget {
+  const _BarRow({
+    required this.label,
+    required this.valueLabel,
+    required this.value,
+    required this.maxValue,
+    required this.color,
+  });
+
+  final String label;
+  final String valueLabel;
+  final double value;
+  final double maxValue;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = maxValue <= 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
+    return Row(
+      children: [
+        SizedBox(
+          width: 76,
+          child: Text(label, style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+        ),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = value <= 0 ? 0.0 : (constraints.maxWidth * ratio).clamp(4.0, constraints.maxWidth);
+              return Container(
+                height: 9,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                alignment: Alignment.centerLeft,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: width,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 76,
+          child: Text(
+            valueLabel,
+            textAlign: TextAlign.end,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+      ],
+    );
+  }
+}

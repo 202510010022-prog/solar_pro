@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "url": "https://SEU-PROJETO.supabase.co",
+  "anon_key": "SUA_SUPABASE_ANON_KEY",
+  "auth_mode": "email_password"
+}
