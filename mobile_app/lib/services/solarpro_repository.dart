@@ -14,6 +14,7 @@ import '../models/team_invite_result.dart';
 import 'auth_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
+import 'company_service.dart';
 import 'project_service.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
@@ -28,6 +29,13 @@ class SolarProRepository {
       currentUserId: () => currentUser?.id,
       cacheKey: _cacheKey,
       ensureCompanyCanWrite: _ensureCompanyCanWrite,
+    );
+    _company = CompanyService(
+      _supabase,
+      _cache,
+      currentCompanyId: _currentCompanyId,
+      cacheKey: _cacheKey,
+      loadProjects: loadProjects,
     );
     _clients = ClientService(
       _supabase,
@@ -44,6 +52,7 @@ class SolarProRepository {
   final CacheService _cache;
   late final AuthService _auth;
   late final ProjectService _projects;
+  late final CompanyService _company;
   late final ClientService _clients;
 
   User? get currentUser => _auth.currentUser;
@@ -82,71 +91,24 @@ class SolarProRepository {
         .toList();
   }
 
-  Future<AppSubscription> loadSubscription({bool cacheFirst = true}) async {
-    final key = _cacheKey('subscription');
-    if (cacheFirst) {
-      final cached = await _cache.loadJsonList(key);
-      if (cached.isNotEmpty) {
-        _refreshSubscriptionInBackground();
-        return AppSubscription.fromMap(cached.first);
-      }
-    }
-
-    final row = await _supabase
-        .from('company_billing_overview')
-        .select()
-        .eq('company_id', await _currentCompanyId())
-        .limit(1)
-        .single();
-    final data = Map<String, dynamic>.from(row);
-    await _cache.saveJsonList(key, [data]);
-    return AppSubscription.fromMap(data);
-  }
+  Future<AppSubscription> loadSubscription({bool cacheFirst = true}) =>
+      _company.loadSubscription(cacheFirst: cacheFirst);
 
   Future<SubscriptionValidation> validateProjectCreation({
     AppSubscription? cachedSubscription,
-  }) async {
-    final writeValidation = await validateCompanyWriteAccess(
-      cachedSubscription: cachedSubscription,
-    );
-    if (!writeValidation.allowed) return writeValidation;
-
-    final subscription =
-        cachedSubscription ?? await loadSubscription(cacheFirst: false);
-
-    final monthlyLimit = subscription.maxProjectsPerMonth;
-    if (monthlyLimit == null) {
-      return const SubscriptionValidation.allowed();
-    }
-
-    final projects = await loadProjects(cacheFirst: false);
-    final now = DateTime.now();
-    final createdThisMonth = projects.where((project) {
-      final date = DateTime.tryParse(project.projectDate);
-      return date != null && date.year == now.year && date.month == now.month;
-    }).length;
-
-    if (createdThisMonth >= monthlyLimit) {
-      return SubscriptionValidation.blocked(
-        'Limite mensal do plano ${subscription.planName} atingido: $monthlyLimit projetos por mês.',
+  }) =>
+      _company.validateProjectCreation(
+        cachedSubscription: cachedSubscription,
       );
-    }
-
-    return const SubscriptionValidation.allowed();
-  }
 
   Future<SubscriptionValidation> validateCompanyWriteAccess({
     AppSubscription? cachedSubscription,
     String action = 'realizar esta ação',
-  }) async {
-    final subscription =
-        cachedSubscription ?? await loadSubscription(cacheFirst: false);
-    if (subscription.isActive) return const SubscriptionValidation.allowed();
-
-    return SubscriptionValidation.blocked(
-      'Empresa ${subscription.statusLabel.toLowerCase()}. Regularize o plano para $action.',
-    );
-  }
+  }) =>
+      _company.validateCompanyWriteAccess(
+        cachedSubscription: cachedSubscription,
+        action: action,
+      );
 
   Future<void> _ensureCompanyCanWrite(String action) async {
     final validation = await validateCompanyWriteAccess(action: action);
@@ -696,20 +658,6 @@ class SolarProRepository {
   Future<void> _refreshProjectsInBackground() =>
       _projects.refreshProjectsInBackground();
 
-  Future<void> _refreshSubscriptionInBackground() async {
-    try {
-      final row = await _supabase
-          .from('company_billing_overview')
-          .select()
-          .eq('company_id', await _currentCompanyId())
-          .limit(1)
-          .single();
-      await _cache.saveJsonList(
-        _cacheKey('subscription'),
-        [Map<String, dynamic>.from(row)],
-      );
-    } catch (_) {
-      // Offline-first: cache remains valid when network is unavailable.
-    }
-  }
+  Future<void> _refreshSubscriptionInBackground() =>
+      _company.refreshSubscriptionInBackground();
 }
