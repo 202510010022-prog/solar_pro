@@ -14,12 +14,21 @@ import '../models/team_invite_result.dart';
 import 'auth_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
+import 'project_service.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
 
 class SolarProRepository {
   SolarProRepository(this._supabase, this._cache) {
     _auth = AuthService(_supabase, _cache, () => _cacheScopePrefix);
+    _projects = ProjectService(
+      _supabase,
+      _cache,
+      currentCompanyId: _currentCompanyId,
+      currentUserId: () => currentUser?.id,
+      cacheKey: _cacheKey,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+    );
     _clients = ClientService(
       _supabase,
       _cache,
@@ -34,6 +43,7 @@ class SolarProRepository {
   final SupabaseClient _supabase;
   final CacheService _cache;
   late final AuthService _auth;
+  late final ProjectService _projects;
   late final ClientService _clients;
 
   User? get currentUser => _auth.currentUser;
@@ -148,26 +158,8 @@ class SolarProRepository {
   Future<List<Client>> loadClients({bool cacheFirst = true}) =>
       _clients.loadClients(cacheFirst: cacheFirst);
 
-  Future<List<Project>> loadProjects({bool cacheFirst = true}) async {
-    final companyId = await _currentCompanyId();
-    final key = _cacheKey('projects');
-    if (cacheFirst) {
-      final cached = await _cache.loadJsonList(key);
-      if (cached.isNotEmpty) {
-        _refreshProjectsInBackground();
-        return cached.map(Project.fromMap).toList();
-      }
-    }
-
-    final rows = await _supabase
-        .from('projects')
-        .select('*, clients(name)')
-        .eq('company_id', companyId)
-        .order('id', ascending: false);
-    final data = rows.map((row) => Map<String, dynamic>.from(row)).toList();
-    await _cache.saveJsonList(key, data);
-    return data.map(Project.fromMap).toList();
-  }
+  Future<List<Project>> loadProjects({bool cacheFirst = true}) =>
+      _projects.loadProjects(cacheFirst: cacheFirst);
 
   Future<Set<int>> loadClientIdsWithProjects({bool cacheFirst = true}) =>
       _clients.loadClientIdsWithProjects(cacheFirst: cacheFirst);
@@ -181,14 +173,8 @@ class SolarProRepository {
 
   Future<CepLookupResult> lookupCep(String cep) => _clients.lookupCep(cep);
 
-  Future<void> updateProjectStatus(int projectId, String status) async {
-    await _ensureCompanyCanWrite('alterar projetos');
-    await _supabase.from('projects').update({
-      'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', projectId);
-    await _refreshProjectsInBackground();
-  }
+  Future<void> updateProjectStatus(int projectId, String status) =>
+      _projects.updateProjectStatus(projectId, status);
 
   Future<void> updateProjectSummary({
     required int projectId,
@@ -202,23 +188,20 @@ class SolarProRepository {
     required double energyTariff,
     required double modulePower,
     required double paybackYears,
-  }) async {
-    await _ensureCompanyCanWrite('editar projetos');
-    await _supabase.from('projects').update({
-      'status': status,
-      'project_value': projectValue,
-      'labor_cost': laborCost,
-      'module_unit_cost': moduleUnitCost,
-      'inverter_cost': inverterCost,
-      'support_cost': supportCost,
-      'extra_materials': jsonEncode(extraMaterials),
-      'energy_tariff': energyTariff,
-      'module_power': modulePower,
-      'payback_years': paybackYears,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', projectId);
-    await _refreshProjectsInBackground();
-  }
+  }) =>
+      _projects.updateProjectSummary(
+        projectId: projectId,
+        status: status,
+        projectValue: projectValue,
+        laborCost: laborCost,
+        moduleUnitCost: moduleUnitCost,
+        inverterCost: inverterCost,
+        supportCost: supportCost,
+        extraMaterials: extraMaterials,
+        energyTariff: energyTariff,
+        modulePower: modulePower,
+        paybackYears: paybackYears,
+      );
 
   Future<void> updateProjectFinancialPlan({
     required int projectId,
@@ -244,11 +227,8 @@ class SolarProRepository {
     await _refreshProjectsInBackground();
   }
 
-  Future<void> deleteProject(int projectId) async {
-    await _ensureCompanyCanWrite('excluir projetos');
-    await _supabase.from('projects').delete().eq('id', projectId);
-    await _refreshProjectsInBackground();
-  }
+  Future<void> deleteProject(int projectId) =>
+      _projects.deleteProject(projectId);
 
   Future<List<ProjectPayment>> loadProjectPayments({
     bool cacheFirst = true,
@@ -299,34 +279,8 @@ class SolarProRepository {
         .eq('company_id', companyId);
   }
 
-  Future<void> createFollowUpMessage(Project project) async {
-    await _ensureCompanyCanWrite('enviar follow-up');
-    final projectId = project.id;
-    if (projectId == null) throw StateError('Projeto sem ID.');
-    final companyId = await _currentCompanyId();
-    final clientName = project.clientName.trim().isEmpty
-        ? 'Cliente sem nome'
-        : project.clientName;
-
-    await _supabase.from('app_messages').insert({
-      'company_id': companyId,
-      'title': 'Follow-up sugerido',
-      'message':
-          'Enviar follow-up para $clientName sobre o projeto #$projectId em negociação.',
-      'type': 'warning',
-      'status': 'unread',
-      'created_by': currentUser?.id,
-    });
-
-    await _supabase
-        .from('projects')
-        .update({
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', projectId)
-        .eq('company_id', companyId);
-    await _refreshProjectsInBackground();
-  }
+  Future<void> createFollowUpMessage(Project project) =>
+      _projects.createFollowUpMessage(project);
 
   Future<PvgisValidationResult> validateWithPvgis({
     required Client client,
@@ -739,22 +693,8 @@ class SolarProRepository {
     }
   }
 
-  Future<void> _refreshProjectsInBackground() async {
-    try {
-      final companyId = await _currentCompanyId();
-      final rows = await _supabase
-          .from('projects')
-          .select('*, clients(name)')
-          .eq('company_id', companyId)
-          .order('id', ascending: false);
-      await _cache.saveJsonList(
-        _cacheKey('projects'),
-        rows.map((row) => Map<String, dynamic>.from(row)).toList(),
-      );
-    } catch (_) {
-      // Offline-first: cache remains valid when network is unavailable.
-    }
-  }
+  Future<void> _refreshProjectsInBackground() =>
+      _projects.refreshProjectsInBackground();
 
   Future<void> _refreshSubscriptionInBackground() async {
     try {
