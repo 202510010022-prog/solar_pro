@@ -10,6 +10,7 @@ import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../models/team_invite_result.dart';
 import 'auth_service.dart';
+import 'billing_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
 import 'company_service.dart';
@@ -59,6 +60,12 @@ class SolarProRepository {
       ensureCompanyCanWrite: _ensureCompanyCanWrite,
       refreshProjectsInBackground: _refreshProjectsInBackground,
     );
+    _billing = BillingService(
+      _supabase,
+      currentCompanyId: _currentCompanyId,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+      refreshSubscriptionInBackground: _refreshSubscriptionInBackground,
+    );
   }
 
   final SupabaseClient _supabase;
@@ -69,6 +76,7 @@ class SolarProRepository {
   late final ClientService _clients;
   late final SizingRepositoryService _sizing;
   late final ProjectFinanceService _projectFinance;
+  late final BillingService _billing;
 
   User? get currentUser => _auth.currentUser;
 
@@ -462,83 +470,37 @@ class SolarProRepository {
     }).eq('id', messageId);
   }
 
-  Future<List<ManualPayment>> loadManualPayments() async {
-    final companyId = await _currentCompanyId();
-    final rows = await _supabase
-        .from('manual_payments')
-        .select()
-        .eq('company_id', companyId)
-        .order('created_at', ascending: false);
-    return rows
-        .map((row) => ManualPayment.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  Future<List<ManualPayment>> loadManualPayments() =>
+      _billing.loadManualPayments();
 
-  Future<List<ManualPayment>> loadOpenManualPayments() async {
-    final companyId = await _currentCompanyId();
-    final rows = await _supabase
-        .from('manual_payments')
-        .select()
-        .eq('company_id', companyId)
-        .inFilter('status', ['pending', 'overdue'])
-        .order('due_date')
-        .limit(5);
-    return rows
-        .map((row) => ManualPayment.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  Future<List<ManualPayment>> loadOpenManualPayments() =>
+      _billing.loadOpenManualPayments();
 
   Future<void> createManualPayment({
     required double amount,
     required DateTime dueDate,
     required String pixReference,
     required String notes,
-  }) async {
-    await _ensureCompanyCanWrite('criar cobranças');
-    await _invokePaymentAction({
-      'action': 'create',
-      'amount': amount,
-      'due_date': dueDate.toIso8601String().split('T').first,
-      'pix_reference': pixReference.trim(),
-      'notes': notes.trim(),
-    });
-  }
+  }) =>
+      _billing.createManualPayment(
+        amount: amount,
+        dueDate: dueDate,
+        pixReference: pixReference,
+        notes: notes,
+      );
 
   Future<void> markManualPaymentPaid(int paymentId,
-      {int periodMonths = 1}) async {
-    await _ensureCompanyCanWrite('confirmar cobranças');
-    await _invokePaymentAction({
-      'action': 'mark_paid',
-      'payment_id': paymentId,
-      'period_months': periodMonths,
-    });
-    await _refreshSubscriptionInBackground();
-  }
+          {int periodMonths = 1}) =>
+      _billing.markManualPaymentPaid(
+        paymentId,
+        periodMonths: periodMonths,
+      );
 
-  Future<void> cancelManualPayment(int paymentId) async {
-    await _ensureCompanyCanWrite('cancelar cobranças');
-    await _invokePaymentAction({
-      'action': 'cancel',
-      'payment_id': paymentId,
-    });
-  }
+  Future<void> cancelManualPayment(int paymentId) =>
+      _billing.cancelManualPayment(paymentId);
 
-  Future<void> syncOverdueManualPayments() async {
-    await _invokePaymentAction({'action': 'sync_overdue'});
-  }
-
-  Future<void> _invokePaymentAction(Map<String, dynamic> body) async {
-    try {
-      await _supabase.functions.invoke('manage-payment', body: body);
-    } on FunctionException catch (error) {
-      final details = error.details;
-      if (details is Map && details['error'] != null) {
-        throw StateError('${details['error']}');
-      }
-      throw StateError(
-          error.reasonPhrase ?? 'Nao foi possivel processar cobranca.');
-    }
-  }
+  Future<void> syncOverdueManualPayments() =>
+      _billing.syncOverdueManualPayments();
 
   Future<void> _refreshProjectsInBackground() =>
       _projects.refreshProjectsInBackground();
