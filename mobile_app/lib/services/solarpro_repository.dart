@@ -14,6 +14,7 @@ import 'billing_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
 import 'company_service.dart';
+import 'message_service.dart';
 import 'project_finance_service.dart';
 import 'project_service.dart';
 import 'pvgis_validation_service.dart';
@@ -72,6 +73,11 @@ class SolarProRepository {
       currentCompanyId: _currentCompanyId,
       ensureCompanyCanWrite: _ensureCompanyCanWrite,
     );
+    _messages = MessageService(
+      _supabase,
+      currentCompanyId: _currentCompanyId,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+    );
   }
 
   final SupabaseClient _supabase;
@@ -84,6 +90,7 @@ class SolarProRepository {
   late final ProjectFinanceService _projectFinance;
   late final BillingService _billing;
   late final TeamService _team;
+  late final MessageService _messages;
 
   User? get currentUser => _auth.currentUser;
 
@@ -369,43 +376,14 @@ class SolarProRepository {
     }).eq('id', feedbackId);
   }
 
-  Future<List<AppMessage>> loadAppMessages({bool unreadOnly = false}) async {
-    final companyId = await _currentCompanyId();
-    final rows = unreadOnly
-        ? await _supabase
-            .from('app_messages')
-            .select()
-            .eq('company_id', companyId)
-            .eq('status', 'unread')
-            .order('created_at', ascending: false)
-            .limit(50)
-        : await _supabase
-            .from('app_messages')
-            .select()
-            .eq('company_id', companyId)
-            .neq('status', 'archived')
-            .order('created_at', ascending: false)
-            .limit(50);
+  Future<List<AppMessage>> loadAppMessages({bool unreadOnly = false}) =>
+      _messages.loadAppMessages(unreadOnly: unreadOnly);
 
-    return rows
-        .map((row) => AppMessage.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  Future<void> markAppMessageRead(int messageId) =>
+      _messages.markAppMessageRead(messageId);
 
-  Future<void> markAppMessageRead(int messageId) async {
-    await _ensureCompanyCanWrite('alterar mensagens');
-    await _supabase.from('app_messages').update({
-      'status': 'read',
-      'read_at': DateTime.now().toIso8601String(),
-    }).eq('id', messageId);
-  }
-
-  Future<void> archiveAppMessage(int messageId) async {
-    await _ensureCompanyCanWrite('arquivar mensagens');
-    await _supabase.from('app_messages').update({
-      'status': 'archived',
-    }).eq('id', messageId);
-  }
+  Future<void> archiveAppMessage(int messageId) =>
+      _messages.archiveAppMessage(messageId);
 
   Future<List<ManualPayment>> loadManualPayments() =>
       _billing.loadManualPayments();
