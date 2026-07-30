@@ -13,6 +13,11 @@ import 'models/admin_plan.dart';
 import 'models/admin_user.dart';
 import 'models/commercial_report_data.dart';
 import 'services/admin_repository.dart';
+import 'widgets/admin_card.dart';
+import 'widgets/admin_error.dart';
+import 'widgets/field.dart';
+import 'widgets/stat_card.dart';
+import 'widgets/status_pills.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -253,7 +258,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (snapshot.hasError) {
-                    return _AdminError(
+                    return AdminError(
                       message: '${snapshot.error}'.replaceFirst(
                         'Bad state: ',
                         '',
@@ -1039,55 +1044,6 @@ class _OperationalSummary extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class StatCard extends StatelessWidget {
-  const StatCard({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return AdminCard(
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: color.withValues(alpha: 0.18),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(color: AdminTheme.muted)),
-                const SizedBox(height: 6),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -2792,116 +2748,6 @@ class MessageTable extends StatelessWidget {
   }
 }
 
-class StatusPill extends StatelessWidget {
-  const StatusPill({super.key, required this.status, required this.active});
-
-  final String status;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = !active
-        ? AdminTheme.muted
-        : switch (status) {
-            'active' => AdminTheme.green,
-            'trial' => AdminTheme.blue,
-            'past_due' => AdminTheme.orange,
-            'blocked' => Colors.redAccent,
-            _ => AdminTheme.purple,
-          };
-    final label = !active
-        ? 'inativa'
-        : switch (status) {
-            'active' => 'ativa',
-            'trial' => 'teste',
-            'past_due' => 'atrasada',
-            'canceled' => 'cancelada',
-            'blocked' => 'bloqueada',
-            _ => status,
-          };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class PaymentStatusPill extends StatelessWidget {
-  const PaymentStatusPill({super.key, required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (status) {
-      'paid' => AdminTheme.green,
-      'overdue' => Colors.redAccent,
-      'canceled' => AdminTheme.muted,
-      _ => AdminTheme.orange,
-    };
-    final label = switch (status) {
-      'paid' => 'paga',
-      'overdue' => 'atrasada',
-      'canceled' => 'cancelada',
-      _ => 'pendente',
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
-class MessageTypePill extends StatelessWidget {
-  const MessageTypePill({super.key, required this.type});
-
-  final String type;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (type) {
-      'billing' => AdminTheme.orange,
-      'warning' => Colors.redAccent,
-      'success' => AdminTheme.green,
-      _ => AdminTheme.cyan,
-    };
-    final label = switch (type) {
-      'billing' => 'Cobrança',
-      'warning' => 'Atenção',
-      'success' => 'Confirmação',
-      _ => 'Informação',
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
-
 class CreateCompanyDialog extends StatefulWidget {
   const CreateCompanyDialog({
     super.key,
@@ -3681,125 +3527,6 @@ class _EditCompanyDialogState extends State<EditCompanyDialog> {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class Field extends StatelessWidget {
-  const Field({
-    super.key,
-    required this.width,
-    required this.controller,
-    required this.label,
-  });
-
-  final double width;
-  final TextEditingController controller;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(labelText: label),
-      ),
-    );
-  }
-}
-
-class AdminCard extends StatelessWidget {
-  const AdminCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(18),
-  });
-
-  final Widget child;
-  final EdgeInsetsGeometry padding;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: AdminTheme.surface,
-        border: Border.all(color: AdminTheme.border),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x44007BFF),
-            blurRadius: 34,
-            offset: Offset(0, 16),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _AdminError extends StatelessWidget {
-  const _AdminError({
-    required this.message,
-    required this.onRetry,
-    required this.onLogout,
-  });
-
-  final String message;
-  final VoidCallback onRetry;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: AdminCard(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 30,
-                backgroundColor: Color(0x33FF9800),
-                child: Icon(
-                  Icons.warning_amber_rounded,
-                  color: AdminTheme.orange,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Acesso administrativo indisponível',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AdminTheme.muted),
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: onLogout,
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Trocar login'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: onRetry,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Tentar novamente'),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
       ),
