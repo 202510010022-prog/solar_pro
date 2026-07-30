@@ -13,6 +13,7 @@ import 'auth_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
 import 'company_service.dart';
+import 'project_finance_service.dart';
 import 'project_service.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_repository_service.dart';
@@ -51,6 +52,13 @@ class SolarProRepository {
       validateProjectCreation: validateProjectCreation,
       refreshProjectsInBackground: _refreshProjectsInBackground,
     );
+    _projectFinance = ProjectFinanceService(
+      _supabase,
+      currentCompanyId: _currentCompanyId,
+      currentUserId: () => currentUser?.id,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+      refreshProjectsInBackground: _refreshProjectsInBackground,
+    );
   }
 
   final SupabaseClient _supabase;
@@ -60,6 +68,7 @@ class SolarProRepository {
   late final CompanyService _company;
   late final ClientService _clients;
   late final SizingRepositoryService _sizing;
+  late final ProjectFinanceService _projectFinance;
 
   User? get currentUser => _auth.currentUser;
 
@@ -180,38 +189,25 @@ class SolarProRepository {
     required double installmentValue,
     required DateTime? firstDueDate,
     required String notes,
-  }) async {
-    await _ensureCompanyCanWrite('editar financeiro do projeto');
-    await _supabase.from('projects').update({
-      'payment_type': paymentType.trim(),
-      'down_payment': downPayment,
-      'discount': discount,
-      'installments_count': installmentsCount,
-      'installment_value': installmentValue,
-      'first_due_date': firstDueDate?.toIso8601String().split('T').first,
-      'financial_notes': notes.trim(),
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', projectId);
-    await _refreshProjectsInBackground();
-  }
+  }) =>
+      _projectFinance.updateProjectFinancialPlan(
+        projectId: projectId,
+        paymentType: paymentType,
+        downPayment: downPayment,
+        discount: discount,
+        installmentsCount: installmentsCount,
+        installmentValue: installmentValue,
+        firstDueDate: firstDueDate,
+        notes: notes,
+      );
 
   Future<void> deleteProject(int projectId) =>
       _projects.deleteProject(projectId);
 
   Future<List<ProjectPayment>> loadProjectPayments({
     bool cacheFirst = true,
-  }) async {
-    final companyId = await _currentCompanyId();
-    final rows = await _supabase
-        .from('project_payments')
-        .select()
-        .eq('company_id', companyId)
-        .neq('status', 'canceled')
-        .order('paid_at', ascending: false);
-    return rows
-        .map((row) => ProjectPayment.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  }) =>
+      _projectFinance.loadProjectPayments(cacheFirst: cacheFirst);
 
   Future<void> createProjectPayment({
     required int projectId,
@@ -219,33 +215,17 @@ class SolarProRepository {
     required String paymentType,
     required DateTime paidAt,
     required String notes,
-  }) async {
-    await _ensureCompanyCanWrite('registrar pagamentos de clientes');
-    final companyId = await _currentCompanyId();
-    await _supabase.from('project_payments').insert({
-      'company_id': companyId,
-      'project_id': projectId,
-      'amount': amount,
-      'payment_type': paymentType.trim(),
-      'paid_at': paidAt.toIso8601String(),
-      'status': 'paid',
-      'notes': notes.trim(),
-      'created_by': currentUser?.id,
-    });
-  }
+  }) =>
+      _projectFinance.createProjectPayment(
+        projectId: projectId,
+        amount: amount,
+        paymentType: paymentType,
+        paidAt: paidAt,
+        notes: notes,
+      );
 
-  Future<void> cancelProjectPayment(int paymentId) async {
-    await _ensureCompanyCanWrite('cancelar pagamentos de clientes');
-    final companyId = await _currentCompanyId();
-    await _supabase
-        .from('project_payments')
-        .update({
-          'status': 'canceled',
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', paymentId)
-        .eq('company_id', companyId);
-  }
+  Future<void> cancelProjectPayment(int paymentId) =>
+      _projectFinance.cancelProjectPayment(paymentId);
 
   Future<void> createFollowUpMessage(Project project) =>
       _projects.createFollowUpMessage(project);
