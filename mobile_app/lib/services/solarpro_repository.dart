@@ -11,19 +11,23 @@ import '../models/manual_payment.dart';
 import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../models/team_invite_result.dart';
+import 'auth_service.dart';
 import 'cache_service.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
 
 class SolarProRepository {
-  SolarProRepository(this._supabase, this._cache);
+  SolarProRepository(this._supabase, this._cache) {
+    _auth = AuthService(_supabase, _cache, () => _cacheScopePrefix);
+  }
 
   final SupabaseClient _supabase;
   final CacheService _cache;
+  late final AuthService _auth;
 
-  User? get currentUser => _supabase.auth.currentUser;
+  User? get currentUser => _auth.currentUser;
 
-  Stream<AuthState> get authChanges => _supabase.auth.onAuthStateChange;
+  Stream<AuthState> get authChanges => _auth.authChanges;
 
   String get _cacheScopePrefix {
     final userId = currentUser?.id ?? 'anonymous';
@@ -37,23 +41,12 @@ class SolarProRepository {
     return profile.companyId;
   }
 
-  Future<void> signIn(String email, String password) async {
-    await _supabase.auth.signInWithPassword(email: email, password: password);
-  }
+  Future<void> signIn(String email, String password) =>
+      _auth.signIn(email, password);
 
-  Future<void> signOut() async {
-    final prefix = _cacheScopePrefix;
-    await _supabase.auth.signOut();
-    await _cache.removeByPrefix(prefix);
-  }
+  Future<void> signOut() => _auth.signOut();
 
-  Future<AppProfile> loadProfile() async {
-    final userId = currentUser?.id;
-    if (userId == null) throw StateError('Usuário não autenticado.');
-    final row =
-        await _supabase.from('profiles').select().eq('id', userId).single();
-    return AppProfile.fromMap(row);
-  }
+  Future<AppProfile> loadProfile() => _auth.loadProfile();
 
   Future<List<AppProfile>> loadTeamProfiles() async {
     final companyId = await _currentCompanyId();
