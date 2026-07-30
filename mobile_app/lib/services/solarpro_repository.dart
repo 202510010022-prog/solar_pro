@@ -19,6 +19,7 @@ import 'project_service.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_repository_service.dart';
 import 'sizing_service.dart';
+import 'team_service.dart';
 
 class SolarProRepository {
   SolarProRepository(this._supabase, this._cache) {
@@ -66,6 +67,11 @@ class SolarProRepository {
       ensureCompanyCanWrite: _ensureCompanyCanWrite,
       refreshSubscriptionInBackground: _refreshSubscriptionInBackground,
     );
+    _team = TeamService(
+      _supabase,
+      currentCompanyId: _currentCompanyId,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+    );
   }
 
   final SupabaseClient _supabase;
@@ -77,6 +83,7 @@ class SolarProRepository {
   late final SizingRepositoryService _sizing;
   late final ProjectFinanceService _projectFinance;
   late final BillingService _billing;
+  late final TeamService _team;
 
   User? get currentUser => _auth.currentUser;
 
@@ -101,18 +108,7 @@ class SolarProRepository {
 
   Future<AppProfile> loadProfile() => _auth.loadProfile();
 
-  Future<List<AppProfile>> loadTeamProfiles() async {
-    final companyId = await _currentCompanyId();
-    final rows = await _supabase
-        .from('profiles')
-        .select()
-        .eq('company_id', companyId)
-        .order('active', ascending: false)
-        .order('name');
-    return rows
-        .map((row) => AppProfile.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  Future<List<AppProfile>> loadTeamProfiles() => _team.loadTeamProfiles();
 
   Future<AppSubscription> loadSubscription({bool cacheFirst = true}) =>
       _company.loadSubscription(cacheFirst: cacheFirst);
@@ -317,36 +313,15 @@ class SolarProRepository {
     required String permission,
     required String role,
     String password = '',
-  }) async {
-    await _ensureCompanyCanWrite('convidar usuários');
-    try {
-      final response = await _supabase.functions.invoke(
-        'invite-user',
-        body: {
-          'name': name,
-          'email': email,
-          'matricula': matricula,
-          'permission': permission,
-          'role': role,
-          if (password.trim().isNotEmpty) 'password': password.trim(),
-        },
+  }) =>
+      _team.inviteTeamUser(
+        name: name,
+        email: email,
+        matricula: matricula,
+        permission: permission,
+        role: role,
+        password: password,
       );
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        return TeamInviteResult.fromMap(data);
-      }
-      if (data is Map) {
-        return TeamInviteResult.fromMap(Map<String, dynamic>.from(data));
-      }
-      throw StateError('Resposta invalida da funcao de convite.');
-    } on FunctionException catch (error) {
-      final details = error.details;
-      if (details is Map && details['error'] != null) {
-        throw StateError('${details['error']}');
-      }
-      throw StateError(error.reasonPhrase ?? 'Nao foi possivel criar usuario.');
-    }
-  }
 
   Future<void> updateTeamUser({
     required String profileId,
@@ -357,58 +332,20 @@ class SolarProRepository {
     required String role,
     required bool active,
     String password = '',
-  }) async {
-    await _ensureCompanyCanWrite('editar usuários');
-    try {
-      final response = await _supabase.functions.invoke(
-        'invite-user',
-        body: {
-          'action': 'update_user',
-          'id': profileId,
-          'name': name,
-          'email': email,
-          'matricula': matricula,
-          'permission': permission,
-          'role': role,
-          'active': active,
-          if (password.trim().isNotEmpty) 'password': password.trim(),
-        },
+  }) =>
+      _team.updateTeamUser(
+        profileId: profileId,
+        name: name,
+        email: email,
+        matricula: matricula,
+        permission: permission,
+        role: role,
+        active: active,
+        password: password,
       );
-      final data = response.data;
-      if (data is Map && data['error'] != null) {
-        throw StateError('${data['error']}');
-      }
-    } on FunctionException catch (error) {
-      final details = error.details;
-      if (details is Map && details['error'] != null) {
-        throw StateError('${details['error']}');
-      }
-      throw StateError(
-        error.reasonPhrase ?? 'Nao foi possivel atualizar usuario.',
-      );
-    }
-  }
 
-  Future<void> deleteTeamUser(String profileId) async {
-    await _ensureCompanyCanWrite('excluir usuários');
-    try {
-      final response = await _supabase.functions.invoke(
-        'invite-user',
-        body: {'action': 'delete_user', 'id': profileId},
-      );
-      final data = response.data;
-      if (data is Map && data['error'] != null) {
-        throw StateError('${data['error']}');
-      }
-    } on FunctionException catch (error) {
-      final details = error.details;
-      if (details is Map && details['error'] != null) {
-        throw StateError('${details['error']}');
-      }
-      throw StateError(
-          error.reasonPhrase ?? 'Nao foi possivel excluir usuario.');
-    }
-  }
+  Future<void> deleteTeamUser(String profileId) =>
+      _team.deleteTeamUser(profileId);
 
   Future<List<BetaFeedback>> loadBetaFeedback() async {
     final companyId = await _currentCompanyId();
