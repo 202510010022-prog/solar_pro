@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:solarpro_admin/main.dart';
+import 'package:solarpro_admin/app/admin_theme.dart';
 
 void main() {
   test('tema admin esta configurado', () {
