@@ -14,6 +14,7 @@ import 'billing_service.dart';
 import 'cache_service.dart';
 import 'client_service.dart';
 import 'company_service.dart';
+import 'feedback_service.dart';
 import 'message_service.dart';
 import 'project_finance_service.dart';
 import 'project_service.dart';
@@ -78,6 +79,12 @@ class SolarProRepository {
       currentCompanyId: _currentCompanyId,
       ensureCompanyCanWrite: _ensureCompanyCanWrite,
     );
+    _feedback = FeedbackService(
+      _supabase,
+      currentCompanyId: _currentCompanyId,
+      currentUserId: () => currentUser?.id,
+      ensureCompanyCanWrite: _ensureCompanyCanWrite,
+    );
   }
 
   final SupabaseClient _supabase;
@@ -91,6 +98,7 @@ class SolarProRepository {
   late final BillingService _billing;
   late final TeamService _team;
   late final MessageService _messages;
+  late final FeedbackService _feedback;
 
   User? get currentUser => _auth.currentUser;
 
@@ -301,17 +309,13 @@ class SolarProRepository {
     required int rating,
     required String area,
     required String message,
-  }) async {
-    await _ensureCompanyCanWrite('enviar feedback');
-    await _supabase.from('beta_feedback').insert({
-      'company_id': companyId,
-      'profile_id': currentUser?.id,
-      'rating': rating,
-      'area': area,
-      'message': message.trim(),
-      'app_version': 'Solar Pro Mobile 0.1.0',
-    });
-  }
+  }) =>
+      _feedback.submitBetaFeedback(
+        companyId: companyId,
+        rating: rating,
+        area: area,
+        message: message,
+      );
 
   Future<TeamInviteResult> inviteTeamUser({
     required String name,
@@ -354,27 +358,11 @@ class SolarProRepository {
   Future<void> deleteTeamUser(String profileId) =>
       _team.deleteTeamUser(profileId);
 
-  Future<List<BetaFeedback>> loadBetaFeedback() async {
-    final companyId = await _currentCompanyId();
-    final rows = await _supabase
-        .from('beta_feedback')
-        .select('*, profiles(name)')
-        .eq('company_id', companyId)
-        .order('created_at', ascending: false)
-        .limit(30);
-    return rows
-        .map((row) => BetaFeedback.fromMap(Map<String, dynamic>.from(row)))
-        .toList();
-  }
+  Future<List<BetaFeedback>> loadBetaFeedback() =>
+      _feedback.loadBetaFeedback();
 
-  Future<void> updateBetaFeedbackStatus(int feedbackId, String status) async {
-    await _ensureCompanyCanWrite('alterar feedbacks');
-    await _supabase.from('beta_feedback').update({
-      'status': status,
-      'resolved_at':
-          status == 'resolved' ? DateTime.now().toIso8601String() : null,
-    }).eq('id', feedbackId);
-  }
+  Future<void> updateBetaFeedbackStatus(int feedbackId, String status) =>
+      _feedback.updateBetaFeedbackStatus(feedbackId, status);
 
   Future<List<AppMessage>> loadAppMessages({bool unreadOnly = false}) =>
       _messages.loadAppMessages(unreadOnly: unreadOnly);
