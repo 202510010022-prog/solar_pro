@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'project_address.dart';
+
 class ExtraMaterial {
   const ExtraMaterial({required this.name, required this.value});
 
@@ -21,6 +23,7 @@ class Project {
     this.id,
     required this.clientId,
     required this.clientName,
+    required this.address,
     required this.projectDate,
     required this.status,
     required this.averageConsumption,
@@ -57,6 +60,7 @@ class Project {
   final int? id;
   final int clientId;
   final String clientName;
+  final ProjectAddress address;
   final String projectDate;
   final String status;
   final double averageConsumption;
@@ -95,6 +99,7 @@ class Project {
       id: map['id'] is int ? map['id'] as int : int.tryParse('${map['id']}'),
       clientId: _int(map['client_id']),
       clientName: client is Map ? '${client['name'] ?? ''}' : '',
+      address: ProjectAddress.fromMap(map),
       projectDate: '${map['project_date'] ?? ''}',
       status: '${map['status'] ?? 'Em negociação'}',
       averageConsumption: _double(map['average_consumption']),
