@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:supabase/supabase.dart';
 
 import 'supabase_test_clients.dart';
@@ -46,11 +48,9 @@ class FixtureUser {
 
 String newRunId() {
   final now = DateTime.now().toUtc();
-  final stamp = now
-      .toIso8601String()
-      .replaceAll(RegExp(r'[^0-9]'), '')
-      .substring(0, 14);
-  return 'rls_test_$stamp';
+  final stamp = now.microsecondsSinceEpoch.toString();
+  final random = Random.secure().nextInt(0x1000000).toRadixString(36);
+  return 'rls_test_${stamp}_$random';
 }
 
 Future<RlsTestFixtures> createBasicRlsFixtures({
@@ -84,6 +84,29 @@ Future<RlsTestFixtures> createBasicRlsFixtures({
   return RlsTestFixtures(runId: id, companyA: companyA, companyB: companyB);
 }
 
+Future<FixtureCompany> createRlsFixtureCompany({
+  required SupabaseClient serviceRoleClient,
+  required SupabaseAdminApi adminApi,
+  required String runId,
+  required String suffix,
+  required String name,
+  required String status,
+  String? trialEndsAt,
+  String? subscriptionEndsAt,
+}) async {
+  return _createCompanyWithUsers(
+    serviceRoleClient: serviceRoleClient,
+    adminApi: adminApi,
+    runId: runId,
+    suffix: suffix,
+    name: name,
+    status: status,
+    password: 'SolarProTest@2026',
+    trialEndsAt: trialEndsAt,
+    subscriptionEndsAt: subscriptionEndsAt,
+  );
+}
+
 Future<FixtureCompany> _createCompanyWithUsers({
   required SupabaseClient serviceRoleClient,
   required SupabaseAdminApi adminApi,
@@ -92,9 +115,13 @@ Future<FixtureCompany> _createCompanyWithUsers({
   required String name,
   required String status,
   required String password,
+  String? trialEndsAt,
+  String? subscriptionEndsAt,
 }) async {
   final now = DateTime.now().toUtc();
   final future = now.add(const Duration(days: 30)).toIso8601String();
+  final effectiveSubscriptionEndsAt =
+      subscriptionEndsAt ?? (status == 'active' ? future : null);
 
   final companyRow = await serviceRoleClient
       .from('companies')
@@ -104,8 +131,8 @@ Future<FixtureCompany> _createCompanyWithUsers({
         'plan': 'equipe',
         'plan_slug': 'equipe',
         'subscription_status': status,
-        'trial_ends_at': null,
-        'subscription_ends_at': status == 'active' ? future : null,
+        'trial_ends_at': trialEndsAt,
+        'subscription_ends_at': effectiveSubscriptionEndsAt,
         'billing_email': 'billing+$runId.$suffix@solarpro.test',
         'billing_provider': 'manual',
         'billing_notes': 'Fixture de teste RLS $runId.',
@@ -121,7 +148,7 @@ Future<FixtureCompany> _createCompanyWithUsers({
     'status': status,
     'provider': 'manual',
     'current_period_start': now.toIso8601String(),
-    'current_period_end': status == 'active' ? future : null,
+    'current_period_end': effectiveSubscriptionEndsAt,
     'notes': 'Fixture de teste RLS $runId.',
   });
 
