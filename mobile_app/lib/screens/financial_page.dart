@@ -8,6 +8,7 @@ import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 
 const paymentTypes = [
@@ -187,10 +188,15 @@ class _FinancialPageState extends State<FinancialPage> {
                 Navigator.pop(dialogContext);
                 _reload();
                 _message('Dados financeiros atualizados.');
-              } catch (_) {
+              } catch (error) {
                 if (!context.mounted) return;
                 setDialogState(() => saving = false);
-                _message('Não foi possível salvar o financeiro.');
+                _message(
+                  friendlyNetworkError(
+                    error,
+                    fallback: 'Não foi possível salvar o financeiro.',
+                  ),
+                );
               }
             }
 
@@ -338,10 +344,15 @@ class _FinancialPageState extends State<FinancialPage> {
                 Navigator.pop(dialogContext);
                 _reload();
                 _message('Pagamento registrado.');
-              } catch (_) {
+              } catch (error) {
                 if (!context.mounted) return;
                 setDialogState(() => saving = false);
-                _message('Não foi possível registrar o pagamento.');
+                _message(
+                  friendlyNetworkError(
+                    error,
+                    fallback: 'Não foi possível registrar o pagamento.',
+                  ),
+                );
               }
             }
 
@@ -433,8 +444,13 @@ class _FinancialPageState extends State<FinancialPage> {
       await widget.repository.cancelProjectPayment(payment.id);
       _reload();
       _message('Pagamento removido do financeiro.');
-    } catch (_) {
-      _message('Não foi possível remover o pagamento.');
+    } catch (error) {
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível remover o pagamento.',
+        ),
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/project.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 import 'projects_page.dart';
 
@@ -24,12 +25,18 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
   late String status = projectStatuses.contains(widget.project.status)
       ? widget.project.status
       : projectStatuses.first;
-  late final laborCost = TextEditingController(text: widget.project.laborCost.toStringAsFixed(2));
-  late final moduleUnitCost = TextEditingController(text: widget.project.moduleUnitCost.toStringAsFixed(2));
-  late final inverterCost = TextEditingController(text: widget.project.inverterCost.toStringAsFixed(2));
-  late final supportCost = TextEditingController(text: widget.project.supportCost.toStringAsFixed(2));
-  late final tariff = TextEditingController(text: widget.project.energyTariff.toStringAsFixed(2));
-  late final modulePower = TextEditingController(text: widget.project.modulePower.toStringAsFixed(0));
+  late final laborCost =
+      TextEditingController(text: widget.project.laborCost.toStringAsFixed(2));
+  late final moduleUnitCost = TextEditingController(
+      text: widget.project.moduleUnitCost.toStringAsFixed(2));
+  late final inverterCost = TextEditingController(
+      text: widget.project.inverterCost.toStringAsFixed(2));
+  late final supportCost = TextEditingController(
+      text: widget.project.supportCost.toStringAsFixed(2));
+  late final tariff = TextEditingController(
+      text: widget.project.energyTariff.toStringAsFixed(2));
+  late final modulePower = TextEditingController(
+      text: widget.project.modulePower.toStringAsFixed(0));
   final materialName = TextEditingController();
   final materialValue = TextEditingController();
   late final materials = widget.project.extraMaterials
@@ -73,10 +80,17 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
         const SnackBar(content: Text('Projeto atualizado com sucesso.')),
       );
       Navigator.pop(context, true);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível atualizar o projeto.')),
+        SnackBar(
+          content: Text(
+            friendlyNetworkError(
+              error,
+              fallback: 'Não foi possível atualizar o projeto.',
+            ),
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => saving = false);
@@ -91,7 +105,9 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            widget.project.clientName.isEmpty ? 'Cliente sem nome' : widget.project.clientName,
+            widget.project.clientName.isEmpty
+                ? 'Cliente sem nome'
+                : widget.project.clientName,
             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
@@ -106,9 +122,11 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                 DropdownButtonFormField<String>(
                   initialValue: status,
                   items: projectStatuses
-                      .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                      .map((item) =>
+                          DropdownMenuItem(value: item, child: Text(item)))
                       .toList(),
-                  onChanged: (value) => setState(() => status = value ?? status),
+                  onChanged: (value) =>
+                      setState(() => status = value ?? status),
                   decoration: const InputDecoration(labelText: 'Status'),
                 ),
                 const SizedBox(height: 12),
@@ -116,7 +134,8 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                   children: [
                     Expanded(child: _moneyField('Mão de obra', laborCost)),
                     const SizedBox(width: 10),
-                    Expanded(child: _moneyField('Valor por módulo', moduleUnitCost)),
+                    Expanded(
+                        child: _moneyField('Valor por módulo', moduleUnitCost)),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -131,7 +150,8 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                 const Divider(color: AppTheme.border),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Materiais diversos', style: TextStyle(color: AppTheme.muted)),
+                  child: Text('Materiais diversos',
+                      style: TextStyle(color: AppTheme.muted)),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -162,9 +182,11 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text('R\$ ${entry.value.value.toStringAsFixed(2)}'),
+                              Text(
+                                  'R\$ ${entry.value.value.toStringAsFixed(2)}'),
                               IconButton(
-                                onPressed: () => setState(() => materials.removeAt(entry.key)),
+                                onPressed: () => setState(
+                                    () => materials.removeAt(entry.key)),
                                 icon: const Icon(Icons.close_rounded),
                               ),
                             ],
@@ -173,25 +195,34 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                       ),
                 ],
                 const Divider(color: AppTheme.border),
-                _summary('Módulos', '${widget.project.moduleCount} x R\$ ${_number(moduleUnitCost.text).toStringAsFixed(2)}'),
-                _summary('Valor total calculado', 'R\$ ${_totalValue().toStringAsFixed(2)}'),
+                _summary('Módulos',
+                    '${widget.project.moduleCount} x R\$ ${_number(moduleUnitCost.text).toStringAsFixed(2)}'),
+                _summary('Valor total calculado',
+                    'R\$ ${_totalValue().toStringAsFixed(2)}'),
                 const SizedBox(height: 12),
                 TextField(
                   controller: tariff,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Tarifa R\$/kWh'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration:
+                      const InputDecoration(labelText: 'Tarifa R\$/kWh'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: modulePower,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Potência do módulo W'),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration:
+                      const InputDecoration(labelText: 'Potência do módulo W'),
                 ),
                 const SizedBox(height: 18),
                 ElevatedButton.icon(
                   onPressed: saving ? null : save,
                   icon: saving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.save_rounded),
                   label: Text(saving ? 'Salvando...' : 'Salvar alterações'),
                 ),
@@ -206,7 +237,8 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
   double _number(String value) {
     final text = value.trim();
     if (text.contains(',')) {
-      return double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+      return double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ??
+          0;
     }
     return double.tryParse(text) ?? 0;
   }
@@ -226,7 +258,9 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: AppTheme.muted))),
+          Expanded(
+              child:
+                  Text(label, style: const TextStyle(color: AppTheme.muted))),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
         ],
       ),
@@ -245,8 +279,10 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
   }
 
   double _totalValue() {
-    final moduleTotal = widget.project.moduleCount * _number(moduleUnitCost.text);
-    final materialsTotal = materials.fold<double>(0, (sum, item) => sum + item.value);
+    final moduleTotal =
+        widget.project.moduleCount * _number(moduleUnitCost.text);
+    final materialsTotal =
+        materials.fold<double>(0, (sum, item) => sum + item.value);
     return _number(laborCost.text) +
         moduleTotal +
         _number(inverterCost.text) +

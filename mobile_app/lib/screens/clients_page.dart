@@ -4,6 +4,7 @@ import '../models/app_profile.dart';
 import '../models/client.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 import 'client_details_page.dart';
 
@@ -460,11 +461,29 @@ class _ClientsPageState extends State<ClientsPage> {
                       state: state.text.trim().toUpperCase(),
                       addressComplement: addressComplement.text.trim(),
                     );
-                    if (client == null) {
-                      await widget.repository
-                          .createClient(payload, profile.companyId);
-                    } else {
-                      await widget.repository.updateClient(payload);
+                    try {
+                      if (client == null) {
+                        await widget.repository
+                            .createClient(payload, profile.companyId);
+                      } else {
+                        await widget.repository.updateClient(payload);
+                      }
+                    } catch (error) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              friendlyNetworkError(
+                                error,
+                                fallback: client == null
+                                    ? 'Não foi possível salvar o cliente.'
+                                    : 'Não foi possível atualizar o cliente.',
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                      return;
                     }
                     if (context.mounted) Navigator.pop(context, true);
                   },
@@ -515,10 +534,17 @@ class _ClientsPageState extends State<ClientsPage> {
       ScaffoldMessenger.of(this.context).showSnackBar(
         const SnackBar(content: Text('Cliente excluído com sucesso.')),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(this.context).showSnackBar(
-        const SnackBar(content: Text('Não foi possível excluir o cliente.')),
+        SnackBar(
+          content: Text(
+            friendlyNetworkError(
+              error,
+              fallback: 'Não foi possível excluir o cliente.',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -555,9 +581,12 @@ class _ClientsPageState extends State<ClientsPage> {
   }
 
   String _friendlyCepError(Object error) {
-    final text = error.toString().replaceFirst('Bad state: ', '');
+    final text = friendlyNetworkError(
+      error,
+      fallback: 'Não foi possível consultar o CEP agora.',
+    );
     if (text.contains('CEP') || text.contains('cep')) return text;
-    return 'Não foi possível consultar o CEP agora.';
+    return text;
   }
 
   void _showMessage(String text) {

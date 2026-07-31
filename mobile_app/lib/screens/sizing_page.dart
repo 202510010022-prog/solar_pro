@@ -7,6 +7,7 @@ import '../services/pvgis_validation_service.dart';
 import '../services/sizing_service.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 
 class SizingPage extends StatefulWidget {
@@ -186,9 +187,14 @@ class _SizingPageState extends State<SizingPage> {
       );
       if (!mounted) return;
       _message('Projeto salvo com sucesso.');
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      _message('Não foi possível salvar. Verifique sua conexão e login.');
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível salvar. Verifique sua conexão e login.',
+        ),
+      );
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -715,11 +721,11 @@ class _SizingPageState extends State<SizingPage> {
   }
 
   String _friendlyPvgisError(Object error) {
-    final text = error
-        .toString()
-        .replaceFirst('Bad state: ', '')
-        .replaceFirst('Exception: ', '')
-        .trim();
+    final text = friendlyNetworkError(
+      error,
+      fallback:
+          'Não foi possível validar no PVGIS. Confira o endereço e a conexão.',
+    );
     if (text.isEmpty) {
       return 'Não foi possível validar no PVGIS. Confira o endereço e a conexão.';
     }

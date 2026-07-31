@@ -4,6 +4,7 @@ import '../models/project.dart';
 import '../models/app_profile.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 import 'project_details_page.dart';
 import 'project_edit_page.dart';
@@ -291,11 +292,17 @@ class _ProjectTileState extends State<_ProjectTile> {
                         content: Text('Status atualizado com sucesso.')),
                   );
                 }
-              } catch (_) {
+              } catch (error) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Não foi possível atualizar o status.')),
+                    SnackBar(
+                      content: Text(
+                        friendlyNetworkError(
+                          error,
+                          fallback: 'Não foi possível atualizar o status.',
+                        ),
+                      ),
+                    ),
                   );
                 }
               }
@@ -354,10 +361,17 @@ class _ProjectTileState extends State<_ProjectTile> {
           const SnackBar(content: Text('Projeto excluído com sucesso.')),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível excluir o projeto.')),
+          SnackBar(
+            content: Text(
+              friendlyNetworkError(
+                error,
+                fallback: 'Não foi possível excluir o projeto.',
+              ),
+            ),
+          ),
         );
       }
     }
