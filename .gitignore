@@ -41,6 +41,7 @@ dist/backups/
 project_documents/
 dist/project_documents/
 exports/
+releases/
 
 # Build outputs
 build/
