@@ -17,6 +17,8 @@ function getCorsHeaders(origin?: string): Record<string, string> {
   };
 }
 
+let corsHeaders = getCorsHeaders();
+
 const allowedCreatorPermissions = new Set(["diretor", "admin", "owner"]);
 const allowedActions = new Set(["create", "mark_paid", "cancel", "sync_overdue"]);
 
@@ -28,9 +30,12 @@ type PaymentPayload = {
   pix_reference?: string;
   notes?: string;
   period_months?: number | string;
+  idempotency_key?: string;
 };
 
 Deno.serve(async (request) => {
+  corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
+
   if (request.method === "OPTIONS") return jsonResponse({ ok: true });
   if (request.method !== "POST") {
     return jsonResponse({ error: "Metodo nao permitido." }, 405);
@@ -169,11 +174,20 @@ async function createPayment(
       pix_reference: `${payload.pix_reference || ""}`.trim(),
       notes: `${payload.notes || ""}`.trim(),
       created_by: createdBy,
+      idempotency_key: `${payload.idempotency_key || ""}`.trim() || null,
     })
     .select()
     .single();
 
-  if (error) return jsonResponse({ error: error.message }, 400);
+  if (error) {
+    if (
+      `${error.message || ""}`.includes("manual_payments_idempotency_key_unique") ||
+      `${error.code || ""}` === "23505"
+    ) {
+      return jsonResponse({ error: "Esta cobranca ja foi registrada." }, 409);
+    }
+    return jsonResponse({ error: error.message }, 400);
+  }
   await createAppMessage(adminClient, {
     companyId,
     paymentId: data.id,

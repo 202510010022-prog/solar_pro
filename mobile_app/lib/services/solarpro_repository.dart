@@ -388,12 +388,14 @@ class SolarProRepository {
     required DateTime dueDate,
     required String pixReference,
     required String notes,
+    required String idempotencyKey,
   }) =>
       _billing.createManualPayment(
         amount: amount,
         dueDate: dueDate,
         pixReference: pixReference,
         notes: notes,
+        idempotencyKey: idempotencyKey,
       );
 
   Future<void> markManualPaymentPaid(int paymentId, {int periodMonths = 1}) =>

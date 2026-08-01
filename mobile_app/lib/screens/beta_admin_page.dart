@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/beta_feedback.dart';
 import '../models/manual_payment.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 import 'team_users_page.dart';
 
@@ -113,6 +115,7 @@ class _BetaAdminPageState extends State<BetaAdminPage> {
     required DateTime dueDate,
     required String pixReference,
     required String notes,
+    required String idempotencyKey,
   }) async {
     try {
       await widget.repository.createManualPayment(
@@ -120,13 +123,19 @@ class _BetaAdminPageState extends State<BetaAdminPage> {
         dueDate: dueDate,
         pixReference: pixReference,
         notes: notes,
+        idempotencyKey: idempotencyKey,
       );
       await _refresh();
       if (!mounted) return;
       _message('Cobrança criada.');
     } catch (error) {
       if (!mounted) return;
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível criar a cobrança.',
+        ),
+      );
     }
   }
 
@@ -274,6 +283,7 @@ class _PaymentsTab extends StatelessWidget {
     required DateTime dueDate,
     required String pixReference,
     required String notes,
+    required String idempotencyKey,
   }) onCreate;
   final Future<void> Function(ManualPayment payment, int months) onMarkPaid;
   final Future<void> Function(ManualPayment payment) onCancel;
@@ -406,6 +416,7 @@ class _PaymentsTab extends StatelessWidget {
       dueDate: result.dueDate,
       pixReference: result.pixReference,
       notes: result.notes,
+      idempotencyKey: result.idempotencyKey,
     );
   }
 
@@ -663,6 +674,7 @@ class _CreatePaymentDialogState extends State<_CreatePaymentDialog> {
   final amount = TextEditingController();
   final pixReference = TextEditingController();
   final notes = TextEditingController();
+  final idempotencyKey = const Uuid().v4();
   DateTime dueDate = DateTime.now().add(const Duration(days: 7));
 
   @override
@@ -752,6 +764,7 @@ class _CreatePaymentDialogState extends State<_CreatePaymentDialog> {
         dueDate: dueDate,
         pixReference: pixReference.text,
         notes: notes.text,
+        idempotencyKey: idempotencyKey,
       ),
     );
   }
@@ -803,12 +816,14 @@ class _PaymentDraft {
     required this.dueDate,
     required this.pixReference,
     required this.notes,
+    required this.idempotencyKey,
   });
 
   final double amount;
   final DateTime dueDate;
   final String pixReference;
   final String notes;
+  final String idempotencyKey;
 }
 
 class _InvitesTab extends StatelessWidget {

@@ -46,6 +46,7 @@ class BillingService {
     required DateTime dueDate,
     required String pixReference,
     required String notes,
+    required String idempotencyKey,
   }) async {
     await ensureCompanyCanWrite('criar cobranças');
     await _invokePaymentAction({
@@ -54,6 +55,7 @@ class BillingService {
       'due_date': dueDate.toIso8601String().split('T').first,
       'pix_reference': pixReference.trim(),
       'notes': notes.trim(),
+      'idempotency_key': idempotencyKey,
     });
   }
 
