@@ -47,6 +47,7 @@ releases/
 build/
 dist/
 node_modules/
+*.tsbuildinfo
 mobile_app/build/
 admin_app/build/
 desktop_app/build/
@@ -106,3 +107,6 @@ temp/
 # Supabase local runtime files
 .supabase/
 supabase/.temp/
+
+# Prototipo web React - pausado, retomar depois do lancamento do mobile
+web_app/
