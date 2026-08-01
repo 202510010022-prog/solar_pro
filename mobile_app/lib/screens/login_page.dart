@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'password_recovery_page.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.repository, required this.onLoggedIn});
+  const LoginPage(
+      {super.key, required this.repository, required this.onLoggedIn});
 
   final SolarProRepository repository;
   final VoidCallback onLoggedIn;
@@ -19,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   final passwordController = TextEditingController();
   bool loading = false;
   String error = '';
+  String notice = '';
 
   @override
   void dispose() {
@@ -31,6 +34,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {
       loading = true;
       error = '';
+      notice = '';
     });
     try {
       await widget.repository.signIn(
@@ -43,10 +47,25 @@ class _LoginPageState extends State<LoginPage> {
           ? 'Email ou senha incorretos.'
           : 'Não foi possível autenticar: ${exception.message}');
     } catch (_) {
-      setState(() => error = 'Falha de conexão. Verifique a internet e tente novamente.');
+      setState(() =>
+          error = 'Falha de conexão. Verifique a internet e tente novamente.');
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  Future<void> openPasswordRecovery() async {
+    final recovered = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PasswordRecoveryPage(repository: widget.repository),
+      ),
+    );
+    if (!mounted || recovered != true) return;
+    setState(() {
+      error = '';
+      notice = 'Senha alterada com sucesso. Entre novamente.';
+      passwordController.clear();
+    });
   }
 
   @override
@@ -87,21 +106,28 @@ class _LoginPageState extends State<LoginPage> {
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.wb_sunny_rounded, color: Color(0xFFFFC83D), size: 42),
+                          Icon(Icons.wb_sunny_rounded,
+                              color: Color(0xFFFFC83D), size: 42),
                           SizedBox(height: 8),
                           Text.rich(
                             TextSpan(
                               children: [
-                                TextSpan(text: 'solar', style: TextStyle(color: Colors.white)),
-                                TextSpan(text: 'pro', style: TextStyle(color: AppTheme.green)),
+                                TextSpan(
+                                    text: 'solar',
+                                    style: TextStyle(color: Colors.white)),
+                                TextSpan(
+                                    text: 'pro',
+                                    style: TextStyle(color: AppTheme.green)),
                               ],
                             ),
-                            style: TextStyle(fontSize: 38, fontWeight: FontWeight.w900),
+                            style: TextStyle(
+                                fontSize: 38, fontWeight: FontWeight.w900),
                           ),
                           SizedBox(height: 4),
                           Text(
                             'Soluções inteligentes em energia solar',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 13),
                           ),
                         ],
                       ),
@@ -110,7 +136,10 @@ class _LoginPageState extends State<LoginPage> {
                     const Text(
                       'Bem-vindo!',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 8),
                     const Text(
@@ -119,7 +148,9 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(color: Colors.white70),
                     ),
                     const SizedBox(height: 28),
-                    const Text('E-mail', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    const Text('E-mail',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: emailController,
@@ -131,7 +162,9 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    const Text('Senha', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                    const Text('Senha',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: passwordController,
@@ -145,8 +178,25 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     if (error.isNotEmpty) ...[
                       const SizedBox(height: 12),
-                      Text(error, style: const TextStyle(color: Colors.redAccent)),
+                      Text(error,
+                          style: const TextStyle(color: Colors.redAccent)),
                     ],
+                    if (notice.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(notice,
+                          style: const TextStyle(color: AppTheme.green)),
+                    ],
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: loading ? null : openPasswordRecovery,
+                        child: const Text(
+                          'Esqueci minha senha',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: loading ? null : submit,

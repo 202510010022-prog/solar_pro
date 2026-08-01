@@ -120,6 +120,20 @@ class SolarProRepository {
   Future<void> signIn(String email, String password) =>
       _auth.signIn(email, password);
 
+  Future<void> sendPasswordRecoveryCode(String email) =>
+      _auth.sendPasswordRecoveryCode(email);
+
+  Future<void> resetPasswordWithRecoveryCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      _auth.resetPasswordWithRecoveryCode(
+        email: email,
+        code: code,
+        newPassword: newPassword,
+      );
+
   Future<void> signOut() => _auth.signOut();
 
   Future<AppProfile> loadProfile() => _auth.loadProfile();

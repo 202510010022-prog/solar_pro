@@ -18,6 +18,24 @@ class AuthService {
     await _supabase.auth.signInWithPassword(email: email, password: password);
   }
 
+  Future<void> sendPasswordRecoveryCode(String email) async {
+    await _supabase.auth.resetPasswordForEmail(email);
+  }
+
+  Future<void> resetPasswordWithRecoveryCode({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _supabase.auth.verifyOTP(
+      email: email,
+      token: code,
+      type: OtpType.recovery,
+    );
+    await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+    await signOut();
+  }
+
   Future<void> signOut() async {
     final prefix = _cacheScopePrefix();
     await _supabase.auth.signOut();
