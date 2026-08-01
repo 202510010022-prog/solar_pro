@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/app_profile.dart';
 import '../models/project.dart';
@@ -318,6 +319,7 @@ class _FinancialPageState extends State<FinancialPage> {
     DateTime paidAt = DateTime.now();
     final amount = TextEditingController();
     final notes = TextEditingController();
+    final idempotencyKey = const Uuid().v4();
     var saving = false;
 
     await showDialog<void>(
@@ -339,6 +341,7 @@ class _FinancialPageState extends State<FinancialPage> {
                   paymentType: paymentType,
                   paidAt: paidAt,
                   notes: notes.text,
+                  idempotencyKey: idempotencyKey,
                 );
                 if (!context.mounted) return;
                 Navigator.pop(dialogContext);

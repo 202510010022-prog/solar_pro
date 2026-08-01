@@ -62,6 +62,7 @@ class ProjectFinanceService {
     required String paymentType,
     required DateTime paidAt,
     required String notes,
+    required String idempotencyKey,
   }) async {
     await ensureCompanyCanWrite('registrar pagamentos de clientes');
     final companyId = await currentCompanyId();
@@ -74,6 +75,7 @@ class ProjectFinanceService {
       'status': 'paid',
       'notes': notes.trim(),
       'created_by': currentUserId(),
+      'idempotency_key': idempotencyKey,
     });
   }
 

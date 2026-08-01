@@ -16,6 +16,13 @@ String friendlyNetworkError(
       .trim();
   final lower = text.toLowerCase();
 
+  if (lower.contains('project_payments_idempotency_key_unique') ||
+      lower.contains('manual_payments_idempotency_key_unique') ||
+      (lower.contains('duplicate key') &&
+          lower.contains('idempotency_key'))) {
+    return 'Este pagamento já foi registrado.';
+  }
+
   if (lower.contains('socketexception') ||
       lower.contains('failed host lookup') ||
       lower.contains('connection refused') ||

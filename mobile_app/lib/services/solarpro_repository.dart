@@ -235,6 +235,7 @@ class SolarProRepository {
     required String paymentType,
     required DateTime paidAt,
     required String notes,
+    required String idempotencyKey,
   }) =>
       _projectFinance.createProjectPayment(
         projectId: projectId,
@@ -242,6 +243,7 @@ class SolarProRepository {
         paymentType: paymentType,
         paidAt: paidAt,
         notes: notes,
+        idempotencyKey: idempotencyKey,
       );
 
   Future<void> cancelProjectPayment(int paymentId) =>
