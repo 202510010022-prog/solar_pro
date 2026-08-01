@@ -10,7 +10,7 @@ import '../models/project_payment.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
-import '../widgets/project_status_chart.dart';
+import '../widgets/project_distribution_vertical_chart.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
@@ -253,8 +253,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 money: money,
                 onOpenBilling: () => widget.onOpenTab(4),
               ),
-              const SizedBox(height: 14),
-              ProjectStatusChart(projects: projects),
               const SizedBox(height: 14),
               _StatusDistribution(
                 negotiating: negotiating,
@@ -1118,7 +1116,6 @@ class _StatusDistribution extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = negotiating + closed + completed + rejected;
     return NeonCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1126,38 +1123,29 @@ class _StatusDistribution extends StatelessWidget {
           const Text('Distribuição dos projetos',
               style: TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
-          _bar('Em negociação', negotiating, total, AppTheme.orange),
-          _bar('Aprovados', closed, total, AppTheme.green),
-          _bar('Concluídos', completed, total, AppTheme.neonBlue),
-          _bar('Não aprovados', rejected, total, AppTheme.purple),
-        ],
-      ),
-    );
-  }
-
-  Widget _bar(String label, int value, int total, Color color) {
-    final ratio = total == 0 ? 0.0 : value / total;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: const TextStyle(color: AppTheme.muted)),
-              Text('$value',
-                  style: const TextStyle(fontWeight: FontWeight.w900)),
+          ProjectDistributionVerticalChart(
+            items: [
+              ProjectDistributionBarItem(
+                label: 'Em negociação',
+                value: negotiating,
+                color: AppTheme.orange,
+              ),
+              ProjectDistributionBarItem(
+                label: 'Aprovados',
+                value: closed,
+                color: AppTheme.green,
+              ),
+              ProjectDistributionBarItem(
+                label: 'Concluídos',
+                value: completed,
+                color: AppTheme.neonBlue,
+              ),
+              ProjectDistributionBarItem(
+                label: 'Não aprovados',
+                value: rejected,
+                color: AppTheme.purple,
+              ),
             ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 8,
-              backgroundColor: color.withValues(alpha: 0.16),
-              valueColor: AlwaysStoppedAnimation(color),
-            ),
           ),
         ],
       ),
