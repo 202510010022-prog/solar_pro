@@ -17,12 +17,24 @@ function getCorsHeaders(origin?: string): Record<string, string> {
   };
 }
 
+let corsHeaders = getCorsHeaders();
+
 const allowedCreatorPermissions = new Set(["diretor", "admin", "owner"]);
 const allowedNewPermissions = new Set([
   "assessor_projetos",
   "assessor_daf",
   "diretor",
 ]);
+const permissionRanks: Record<string, number> = {
+  assessor_projetos: 10,
+  assessor_daf: 20,
+  diretor: 30,
+  owner: 40,
+  admin: 40,
+  platform_admin: 50,
+};
+const assignmentPermissionError =
+  "Você não tem permissão para atribuir este nível de acesso.";
 
 type InvitePayload = {
   action?: string;
@@ -37,6 +49,8 @@ type InvitePayload = {
 };
 
 Deno.serve(async (request) => {
+  corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
+
   if (request.method === "OPTIONS") {
     return jsonResponse({ ok: true });
   }
@@ -120,6 +134,9 @@ Deno.serve(async (request) => {
     const permission = normalized.permission;
     if (!allowedNewPermissions.has(permission)) {
       return jsonResponse({ error: "Permissao do novo usuario invalida." }, 400);
+    }
+    if (!canAssignPermission(callerProfile.permission, permission)) {
+      return jsonResponse({ error: assignmentPermissionError }, 403);
     }
 
     const limitError = await validateUserLimit(
@@ -265,6 +282,9 @@ async function updateTeamUser(
 
   if (!allowedNewPermissions.has(normalized.permission)) {
     return jsonResponse({ error: "Permissao do usuario invalida." }, 400);
+  }
+  if (!canAssignPermission(callerProfile.permission, normalized.permission)) {
+    return jsonResponse({ error: assignmentPermissionError }, 403);
   }
 
   if (target.permission === "owner" && callerId !== userId) {
@@ -432,6 +452,12 @@ function defaultRole(permission: string) {
 
 function switchPermission(permission: string, labels: Record<string, string>) {
   return labels[permission] ?? "Assessor de Projetos";
+}
+
+function canAssignPermission(callerPermission: string, assignedPermission: string) {
+  const callerRank = permissionRanks[`${callerPermission}`] ?? 0;
+  const assignedRank = permissionRanks[`${assignedPermission}`] ?? 0;
+  return assignedRank > 0 && callerRank > assignedRank;
 }
 
 function friendlyAuthError(message = "") {
