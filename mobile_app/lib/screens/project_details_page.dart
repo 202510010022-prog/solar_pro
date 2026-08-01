@@ -34,7 +34,9 @@ class ProjectDetailsPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            project.clientName.isEmpty ? 'Cliente sem nome' : project.clientName,
+            project.clientName.isEmpty
+                ? 'Cliente sem nome'
+                : project.clientName,
             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
@@ -47,31 +49,44 @@ class ProjectDetailsPage extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _Metric(title: 'Potência', value: '${project.systemPower.toStringAsFixed(2)} kWp'),
+              _Metric(
+                  title: 'Potência',
+                  value: '${project.systemPower.toStringAsFixed(2)} kWp'),
               _Metric(title: 'Módulos', value: '${project.moduleCount}'),
-              _Metric(title: 'Produção anual', value: '${project.annualGeneration.toStringAsFixed(0)} kWh'),
-              _Metric(title: 'Payback', value: '${project.paybackYears.toStringAsFixed(2)} anos'),
+              _Metric(
+                  title: 'Produção anual',
+                  value: '${project.annualGeneration.toStringAsFixed(0)} kWh'),
+              _Metric(
+                  title: 'Payback',
+                  value: '${project.paybackYears.toStringAsFixed(2)} anos'),
             ],
           ),
+          const SizedBox(height: 14),
+          _ProjectAddressCard(project: project),
           const SizedBox(height: 14),
           NeonCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Resumo financeiro', style: TextStyle(fontWeight: FontWeight.w900)),
+                const Text('Resumo financeiro',
+                    style: TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 12),
                 _row('Valor do projeto', money.format(project.projectValue)),
                 _row('Mão de obra', money.format(project.laborCost)),
-                _row('Módulos', '${project.moduleCount} x ${money.format(project.moduleUnitCost)}'),
+                _row('Módulos',
+                    '${project.moduleCount} x ${money.format(project.moduleUnitCost)}'),
                 _row('Inversor', money.format(project.inverterCost)),
                 _row('Suportes', money.format(project.supportCost)),
                 ...project.extraMaterials.map(
                   (item) => _row(item.name, money.format(item.value)),
                 ),
                 _divider(),
-                _row('Economia mensal estimada', money.format(project.monthlySavings)),
-                _row('Geração média mensal', '${project.monthlyGeneration.toStringAsFixed(0)} kWh'),
-                _row('Consumo anual', '${project.annualConsumption.toStringAsFixed(0)} kWh'),
+                _row('Economia mensal estimada',
+                    money.format(project.monthlySavings)),
+                _row('Geração média mensal',
+                    '${project.monthlyGeneration.toStringAsFixed(0)} kWh'),
+                _row('Consumo anual',
+                    '${project.annualConsumption.toStringAsFixed(0)} kWh'),
               ],
             ),
           ),
@@ -80,7 +95,8 @@ class ProjectDetailsPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Geração x consumo', style: TextStyle(fontWeight: FontWeight.w900)),
+                const Text('Geração x consumo',
+                    style: TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 12),
                 const Wrap(
                   spacing: 12,
@@ -89,7 +105,8 @@ class ProjectDetailsPage extends StatelessWidget {
                     _LegendDot(label: 'Consumo', color: AppTheme.orange),
                     _LegendDot(label: 'Geração', color: AppTheme.primaryBlue),
                     _LegendDot(label: 'Saldo positivo', color: AppTheme.green),
-                    _LegendDot(label: 'Saldo negativo', color: Colors.redAccent),
+                    _LegendDot(
+                        label: 'Saldo negativo', color: Colors.redAccent),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -124,7 +141,8 @@ class ProjectDetailsPage extends StatelessWidget {
               children: [
                 Text(label, style: const TextStyle(color: AppTheme.muted)),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(value,
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
               ],
             );
           }
@@ -133,7 +151,8 @@ class ProjectDetailsPage extends StatelessWidget {
             children: [
               Expanded(
                 flex: 5,
-                child: Text(label, style: const TextStyle(color: AppTheme.muted)),
+                child:
+                    Text(label, style: const TextStyle(color: AppTheme.muted)),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -161,7 +180,61 @@ class ProjectDetailsPage extends StatelessWidget {
     );
   }
 
-  double _at(List<double> values, int index) => index < values.length ? values[index] : 0;
+  double _at(List<double> values, int index) =>
+      index < values.length ? values[index] : 0;
+}
+
+class _ProjectAddressCard extends StatelessWidget {
+  const _ProjectAddressCard({required this.project});
+
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    final address = project.address;
+    final addressLine = address.addressLine.trim();
+    final complement = address.addressComplement.trim();
+    final hasAddress = addressLine.isNotEmpty || complement.isNotEmpty;
+
+    return NeonCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.green.withValues(alpha: 0.12),
+            child: const Icon(Icons.location_on_rounded, color: AppTheme.green),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Endereço da instalação',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  hasAddress ? addressLine : 'Endereço não informado',
+                  style: TextStyle(
+                    color: hasAddress ? AppTheme.text : AppTheme.muted,
+                    fontWeight: hasAddress ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+                if (complement.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    complement,
+                    style: const TextStyle(color: AppTheme.muted),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MonthComparison extends StatelessWidget {
@@ -179,8 +252,10 @@ class _MonthComparison extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxMain = [consumption, generation, 1.0].reduce((a, b) => a > b ? a : b);
-    final maxBalance = [balance.abs(), maxMain * 0.25, 1.0].reduce((a, b) => a > b ? a : b);
+    final maxMain =
+        [consumption, generation, 1.0].reduce((a, b) => a > b ? a : b);
+    final maxBalance =
+        [balance.abs(), maxMain * 0.25, 1.0].reduce((a, b) => a > b ? a : b);
     final balanceColor = balance >= 0 ? AppTheme.green : Colors.redAccent;
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
@@ -235,7 +310,9 @@ class _Metric extends StatelessWidget {
           children: [
             Text(title, style: const TextStyle(color: AppTheme.muted)),
             const SizedBox(height: 6),
-            Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           ],
         ),
       ),
@@ -265,12 +342,16 @@ class _BarRow extends StatelessWidget {
       children: [
         SizedBox(
           width: 76,
-          child: Text(label, style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+          child: Text(label,
+              style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
         ),
         Expanded(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final width = value <= 0 ? 0.0 : (constraints.maxWidth * ratio).clamp(4.0, constraints.maxWidth);
+              final width = value <= 0
+                  ? 0.0
+                  : (constraints.maxWidth * ratio)
+                      .clamp(4.0, constraints.maxWidth);
               return Container(
                 height: 9,
                 decoration: BoxDecoration(
@@ -327,7 +408,8 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
+        Text(label,
+            style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
       ],
     );
   }
