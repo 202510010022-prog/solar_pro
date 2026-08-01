@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/admin_company.dart';
 import '../services/admin_repository.dart';
@@ -25,6 +26,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
   final dueDate = TextEditingController();
   final pixReference = TextEditingController();
   final notes = TextEditingController();
+  final idempotencyKey = const Uuid().v4();
   String companyId = '';
   bool loading = false;
 
@@ -64,6 +66,7 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
         dueDate: parsedDate,
         pixReference: pixReference.text.trim(),
         notes: notes.text.trim(),
+        idempotencyKey: idempotencyKey,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -72,8 +75,11 @@ class _CreatePaymentDialogState extends State<CreatePaymentDialog> {
       );
     } catch (error) {
       if (!mounted) return;
+      final message = '$error'.contains('Esta cobranca ja foi registrada')
+          ? 'Esta cobrança já foi registrada.'
+          : '$error'.replaceFirst('Bad state: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error'.replaceFirst('Bad state: ', ''))),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) setState(() => loading = false);

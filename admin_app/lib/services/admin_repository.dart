@@ -99,6 +99,7 @@ class AdminRepository {
     required DateTime dueDate,
     required String pixReference,
     required String notes,
+    required String idempotencyKey,
   }) async {
     await _invoke(
       'create_payment',
@@ -109,6 +110,7 @@ class AdminRepository {
           'due_date': DateFormat('yyyy-MM-dd').format(dueDate),
           'pix_reference': pixReference,
           'notes': notes,
+          'idempotency_key': idempotencyKey,
         },
       },
     );

@@ -17,6 +17,8 @@ function getCorsHeaders(origin?: string): Record<string, string> {
   };
 }
 
+let corsHeaders = getCorsHeaders();
+
 const platformAdminPermissions = new Set(["platform_admin", "admin"]);
 const companyStatuses = new Set(["trial", "active", "past_due", "canceled", "blocked"]);
 const feedbackStatuses = new Set(["open", "reviewing", "resolved", "archived"]);
@@ -56,6 +58,7 @@ type AdminPayload = {
     pix_reference?: string;
     notes?: string;
     period_months?: number | string;
+    idempotency_key?: string;
   };
   feedback?: {
     id?: number | string;
@@ -83,6 +86,8 @@ type AdminPayload = {
 };
 
 Deno.serve(async (request) => {
+  corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
+
   if (request.method === "OPTIONS") return jsonResponse({ ok: true });
   if (request.method !== "POST") {
     return jsonResponse({ error: "Metodo nao permitido." }, 405);
@@ -389,11 +394,20 @@ async function createPayment(
       pix_reference: payment.pixReference,
       notes: payment.notes,
       created_by: createdBy,
+      idempotency_key: payment.idempotencyKey || null,
     })
     .select()
     .single();
 
-  if (error || !data) return jsonResponse({ error: error?.message ?? "Cobranca nao criada." }, 400);
+  if (error || !data) {
+    if (
+      `${error?.message || ""}`.includes("manual_payments_idempotency_key_unique") ||
+      `${error?.code || ""}` === "23505"
+    ) {
+      return jsonResponse({ error: "Esta cobranca ja foi registrada." }, 409);
+    }
+    return jsonResponse({ error: error?.message ?? "Cobranca nao criada." }, 400);
+  }
 
   await createAppMessage(adminClient, {
     companyId: payment.companyId,
@@ -767,6 +781,7 @@ function normalizePayment(payment: NonNullable<AdminPayload["payment"]>) {
     dueDate: `${payment.due_date || ""}`.trim(),
     pixReference: `${payment.pix_reference || ""}`.trim(),
     notes: `${payment.notes || ""}`.trim(),
+    idempotencyKey: `${payment.idempotency_key || ""}`.trim(),
   };
 }
 
