@@ -7,6 +7,7 @@ import '../models/beta_feedback.dart';
 import '../models/client.dart';
 import '../models/manual_payment.dart';
 import '../models/project.dart';
+import '../models/project_address.dart';
 import '../models/project_payment.dart';
 import '../models/team_invite_result.dart';
 import 'auth_service.dart';
@@ -250,14 +251,14 @@ class SolarProRepository {
       _projects.createFollowUpMessage(project);
 
   Future<PvgisValidationResult> validateWithPvgis({
-    required Client client,
+    required ProjectAddress address,
     required double installedPowerKwp,
     required double estimatedAnnualGeneration,
     double? latitude,
     double? longitude,
   }) =>
       _sizing.validateWithPvgis(
-        client: client,
+        address: address,
         installedPowerKwp: installedPowerKwp,
         estimatedAnnualGeneration: estimatedAnnualGeneration,
         latitude: latitude,
@@ -265,13 +266,14 @@ class SolarProRepository {
       );
 
   Future<PvgisValidationResult> lookupMonthlyHspWithPvgis({
-    required Client client,
+    required ProjectAddress address,
   }) =>
-      _sizing.lookupMonthlyHspWithPvgis(client: client);
+      _sizing.lookupMonthlyHspWithPvgis(address: address);
 
   Future<void> createSizingProject({
     required int clientId,
     required String companyId,
+    required ProjectAddress address,
     required List<double> monthlyConsumption,
     required List<double> monthlyHsp,
     required double generationExtraPercent,
@@ -289,6 +291,7 @@ class SolarProRepository {
       _sizing.createSizingProject(
         clientId: clientId,
         companyId: companyId,
+        address: address,
         monthlyConsumption: monthlyConsumption,
         monthlyHsp: monthlyHsp,
         generationExtraPercent: generationExtraPercent,
@@ -358,8 +361,7 @@ class SolarProRepository {
   Future<void> deleteTeamUser(String profileId) =>
       _team.deleteTeamUser(profileId);
 
-  Future<List<BetaFeedback>> loadBetaFeedback() =>
-      _feedback.loadBetaFeedback();
+  Future<List<BetaFeedback>> loadBetaFeedback() => _feedback.loadBetaFeedback();
 
   Future<void> updateBetaFeedbackStatus(int feedbackId, String status) =>
       _feedback.updateBetaFeedbackStatus(feedbackId, status);
@@ -392,8 +394,7 @@ class SolarProRepository {
         notes: notes,
       );
 
-  Future<void> markManualPaymentPaid(int paymentId,
-          {int periodMonths = 1}) =>
+  Future<void> markManualPaymentPaid(int paymentId, {int periodMonths = 1}) =>
       _billing.markManualPaymentPaid(
         paymentId,
         periodMonths: periodMonths,

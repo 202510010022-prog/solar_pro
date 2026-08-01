@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../models/app_subscription.dart';
 import '../models/client.dart';
+import '../models/project_address.dart';
 import '../services/pvgis_validation_service.dart';
 import '../services/sizing_service.dart';
 import '../services/solarpro_repository.dart';
@@ -38,6 +39,13 @@ class _SizingPageState extends State<SizingPage> {
   final supportCost = TextEditingController(text: '2500');
   final materialName = TextEditingController();
   final materialValue = TextEditingController();
+  final addressZipCode = TextEditingController();
+  final addressStreet = TextEditingController();
+  final addressNumber = TextEditingController();
+  final addressNeighborhood = TextEditingController();
+  final addressCity = TextEditingController();
+  final addressState = TextEditingController();
+  final addressComplement = TextEditingController();
   final extraMaterials = <_MaterialItem>[];
 
   SizingResult? result;
@@ -81,12 +89,18 @@ class _SizingPageState extends State<SizingPage> {
     ]) {
       controller.addListener(calculate);
     }
+    for (final controller in _addressControllers) {
+      controller.addListener(_refreshAddressPreview);
+    }
     loadClients();
     calculate();
   }
 
   @override
   void dispose() {
+    for (final controller in _addressControllers) {
+      controller.removeListener(_refreshAddressPreview);
+    }
     for (final controller in [
       ...consumption,
       ...hsp,
@@ -99,10 +113,53 @@ class _SizingPageState extends State<SizingPage> {
       supportCost,
       materialName,
       materialValue,
+      ..._addressControllers,
     ]) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  List<TextEditingController> get _addressControllers => [
+        addressZipCode,
+        addressStreet,
+        addressNumber,
+        addressNeighborhood,
+        addressCity,
+        addressState,
+        addressComplement,
+      ];
+
+  ProjectAddress get currentAddress => ProjectAddress(
+        zipCode: _digitsOnly(addressZipCode.text),
+        street: addressStreet.text.trim(),
+        addressNumber: addressNumber.text.trim(),
+        neighborhood: addressNeighborhood.text.trim(),
+        city: addressCity.text.trim(),
+        state: addressState.text.trim().toUpperCase(),
+        addressComplement: addressComplement.text.trim(),
+      );
+
+  void _refreshAddressPreview() {
+    if (mounted) setState(() {});
+  }
+
+  void _fillAddress(ProjectAddress address) {
+    addressZipCode.text = address.zipCode;
+    addressStreet.text = address.street;
+    addressNumber.text = address.addressNumber;
+    addressNeighborhood.text = address.neighborhood;
+    addressCity.text = address.city;
+    addressState.text = address.state;
+    addressComplement.text = address.addressComplement;
+  }
+
+  void _fillAddressFromClient(Client? client) {
+    if (client == null) {
+      _fillAddress(const ProjectAddress.empty());
+      return;
+    }
+    _fillAddress(ProjectAddress.fromClient(client));
   }
 
   void calculate({bool keepPvgisValidation = false}) {
@@ -137,11 +194,13 @@ class _SizingPageState extends State<SizingPage> {
     try {
       final loaded = await widget.repository.loadClients();
       if (!mounted) return;
+      final initialClient = loaded.isEmpty ? null : loaded.first;
       setState(() {
         clients = loaded;
-        selectedClient = loaded.isEmpty ? null : loaded.first;
+        selectedClient = initialClient;
         loadingClients = false;
       });
+      _fillAddressFromClient(initialClient);
     } catch (error) {
       if (!mounted) return;
       setState(() => loadingClients = false);
@@ -171,6 +230,7 @@ class _SizingPageState extends State<SizingPage> {
       await widget.repository.createSizingProject(
         clientId: client!.id!,
         companyId: profile.companyId,
+        address: currentAddress,
         monthlyConsumption: consumption.map(_number).toList(),
         monthlyHsp: hsp.map(_number).toList(),
         generationExtraPercent: _number(extra),
@@ -233,11 +293,34 @@ class _SizingPageState extends State<SizingPage> {
                             ),
                           )
                           .toList(),
-                      onChanged: (client) =>
-                          setState(() => selectedClient = client),
+                      onChanged: (client) {
+                        setState(() => selectedClient = client);
+                        _fillAddressFromClient(client);
+                      },
                       decoration: const InputDecoration(
                           labelText: 'Selecione o cliente'),
                     ),
+              const SizedBox(height: 16),
+              const Text(
+                'Endereço deste orçamento',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Pré-preenchido pelo cliente, mas editável apenas para este orçamento.',
+                style: TextStyle(color: AppTheme.muted, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              _ProjectAddressFields(
+                zipCode: addressZipCode,
+                street: addressStreet,
+                addressNumber: addressNumber,
+                neighborhood: addressNeighborhood,
+                city: addressCity,
+                state: addressState,
+                addressComplement: addressComplement,
+                onLookupCep: lookupProjectCep,
+              ),
             ],
           ),
         ),
@@ -249,7 +332,7 @@ class _SizingPageState extends State<SizingPage> {
               _stepTitle('2', 'Consumo e HSP mês a mês'),
               const SizedBox(height: 6),
               const Text(
-                'Informe o consumo em kWh. O HSP pode ser preenchido automaticamente pelo endereço do cliente.',
+                'Informe o consumo em kWh. O HSP pode ser preenchido automaticamente pelo endereço deste orçamento.',
                 style: TextStyle(color: AppTheme.muted),
               ),
               const SizedBox(height: 10),
@@ -272,12 +355,12 @@ class _SizingPageState extends State<SizingPage> {
                     ),
                     const SizedBox(height: 3),
                     const Text(
-                      'Use o endereço do cliente para preencher a irradiação mensal automaticamente.',
+                      'Use o endereço deste orçamento para preencher a irradiação mensal automaticamente.',
                       style: TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 10),
                     ElevatedButton.icon(
-                      onPressed: loadingHsp ? null : fillHspFromClientAddress,
+                      onPressed: loadingHsp ? null : fillHspFromProjectAddress,
                       icon: loadingHsp
                           ? const SizedBox(
                               width: 17,
@@ -355,7 +438,7 @@ class _SizingPageState extends State<SizingPage> {
               _field('Tarifa R\$/kWh', tariff),
               const SizedBox(height: 10),
               _LocationPreview(
-                client: selectedClient,
+                address: currentAddress,
                 onUseCurrentLocation: validateWithCurrentLocation,
               ),
             ],
@@ -507,6 +590,38 @@ class _SizingPageState extends State<SizingPage> {
     );
   }
 
+  Future<void> lookupProjectCep() async {
+    final cep = _digitsOnly(addressZipCode.text);
+    if (cep.length != 8) {
+      _message('Informe um CEP válido com 8 números.');
+      return;
+    }
+
+    try {
+      final lookup = await widget.repository.lookupCep(cep);
+      _fillAddress(
+        ProjectAddress(
+          zipCode: lookup.zipCode,
+          street: lookup.street,
+          addressNumber: addressNumber.text.trim(),
+          neighborhood: lookup.neighborhood,
+          city: lookup.city,
+          state: lookup.state,
+          addressComplement: addressComplement.text.trim(),
+        ),
+      );
+      _message('Endereço deste orçamento preenchido pelo CEP.');
+    } catch (error) {
+      if (!mounted) return;
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível consultar o CEP agora.',
+        ),
+      );
+    }
+  }
+
   Widget _stepTitle(String number, String title) {
     return Row(
       children: [
@@ -592,17 +707,17 @@ class _SizingPageState extends State<SizingPage> {
     await _validateWithPvgis();
   }
 
-  Future<void> fillHspFromClientAddress() async {
-    final client = selectedClient;
-    if (client == null) {
-      _message('Selecione um cliente antes de buscar HSP.');
+  Future<void> fillHspFromProjectAddress() async {
+    final address = currentAddress;
+    if (address.zipCode.isEmpty && address.cityState.isEmpty) {
+      _message('Informe o endereço deste orçamento antes de buscar HSP.');
       return;
     }
 
     setState(() => loadingHsp = true);
     try {
       final lookup = await widget.repository.lookupMonthlyHspWithPvgis(
-        client: client,
+        address: address,
       );
       if (lookup.monthlyHsp.length < 12) {
         _message('PVGIS não retornou HSP mensal completo.');
@@ -614,7 +729,7 @@ class _SizingPageState extends State<SizingPage> {
       }
       calculate();
       if (!mounted) return;
-      _message('HSP mensal preenchido pelo endereço do cliente.');
+      _message('HSP mensal preenchido pelo endereço deste orçamento.');
     } catch (error) {
       if (!mounted) return;
       _message(_friendlyPvgisError(error));
@@ -634,20 +749,23 @@ class _SizingPageState extends State<SizingPage> {
 
   Future<void> _validateWithPvgis({double? latitude, double? longitude}) async {
     final data = result;
-    final client = selectedClient;
+    final address = currentAddress;
+    final hasCoordinates = latitude != null && longitude != null;
     if (data == null || data.systemPower <= 0) {
       _message('Calcule o dimensionamento antes de validar.');
       return;
     }
-    if (client == null) {
-      _message('Selecione um cliente antes de validar.');
+    if (!hasCoordinates &&
+        address.zipCode.isEmpty &&
+        address.cityState.isEmpty) {
+      _message('Informe o endereço deste orçamento antes de validar.');
       return;
     }
 
     setState(() => validatingPvgis = true);
     try {
       final validation = await widget.repository.validateWithPvgis(
-        client: client,
+        address: address,
         latitude: latitude,
         longitude: longitude,
         installedPowerKwp: data.systemPower,
@@ -732,6 +850,8 @@ class _SizingPageState extends State<SizingPage> {
     if (text.length > 220) return '${text.substring(0, 220)}...';
     return text;
   }
+
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
 }
 
 class _MaterialItem {
@@ -743,19 +863,123 @@ class _MaterialItem {
   Map<String, dynamic> toMap() => {'name': name, 'value': value};
 }
 
+class _ProjectAddressFields extends StatelessWidget {
+  const _ProjectAddressFields({
+    required this.zipCode,
+    required this.street,
+    required this.addressNumber,
+    required this.neighborhood,
+    required this.city,
+    required this.state,
+    required this.addressComplement,
+    required this.onLookupCep,
+  });
+
+  final TextEditingController zipCode;
+  final TextEditingController street;
+  final TextEditingController addressNumber;
+  final TextEditingController neighborhood;
+  final TextEditingController city;
+  final TextEditingController state;
+  final TextEditingController addressComplement;
+  final VoidCallback onLookupCep;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 680;
+        if (!twoColumns) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _addressField('CEP', zipCode)),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: onLookupCep,
+                    icon: const Icon(Icons.search_rounded, size: 17),
+                    label: const Text('Buscar'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _addressField('Rua', street),
+              const SizedBox(height: 10),
+              _addressField('Número', addressNumber),
+              const SizedBox(height: 10),
+              _addressField('Bairro', neighborhood),
+              const SizedBox(height: 10),
+              _addressField('Cidade', city),
+              const SizedBox(height: 10),
+              _addressField('Estado', state),
+              const SizedBox(height: 10),
+              _addressField('Complemento', addressComplement),
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: _addressField('CEP', zipCode)),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onLookupCep,
+                  icon: const Icon(Icons.search_rounded, size: 17),
+                  label: const Text('Buscar CEP'),
+                ),
+                const SizedBox(width: 10),
+                Expanded(flex: 2, child: _addressField('Rua', street)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _addressField('Número', addressNumber)),
+                const SizedBox(width: 10),
+                Expanded(child: _addressField('Bairro', neighborhood)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _addressField('Cidade', city)),
+                const SizedBox(width: 10),
+                Expanded(child: _addressField('Estado', state)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _addressField('Complemento', addressComplement),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _addressField(String label, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      textCapitalization: TextCapitalization.words,
+      decoration: InputDecoration(labelText: label),
+    );
+  }
+}
+
 class _LocationPreview extends StatelessWidget {
   const _LocationPreview({
-    required this.client,
+    required this.address,
     required this.onUseCurrentLocation,
   });
 
-  final Client? client;
+  final ProjectAddress address;
   final VoidCallback onUseCurrentLocation;
 
   @override
   Widget build(BuildContext context) {
-    final address = client?.addressLine.trim() ?? '';
-    final hasAddress = address.isNotEmpty;
+    final addressLine = address.addressLine.trim();
+    final hasAddress = addressLine.isNotEmpty;
 
     return Container(
       width: double.infinity,
@@ -788,8 +1012,8 @@ class _LocationPreview extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       hasAddress
-                          ? address
-                          : 'Complete o endereço do cliente para validar pelo PVGIS.',
+                          ? addressLine
+                          : 'Complete o endereço deste orçamento para validar pelo PVGIS.',
                       style:
                           const TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),

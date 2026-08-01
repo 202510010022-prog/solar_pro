@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_subscription.dart';
-import '../models/client.dart';
+import '../models/project_address.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
 
@@ -23,7 +23,7 @@ class SizingRepositoryService {
   final Future<void> Function() refreshProjectsInBackground;
 
   Future<PvgisValidationResult> validateWithPvgis({
-    required Client client,
+    required ProjectAddress address,
     required double installedPowerKwp,
     required double estimatedAnnualGeneration,
     double? latitude,
@@ -38,12 +38,12 @@ class SizingRepositoryService {
             'longitude': longitude,
           } else
             'address': {
-              'zip_code': client.zipCode,
-              'street': client.street,
-              'address_number': client.addressNumber,
-              'neighborhood': client.neighborhood,
-              'city': client.city,
-              'state': client.state,
+              'zip_code': address.zipCode,
+              'street': address.street,
+              'address_number': address.addressNumber,
+              'neighborhood': address.neighborhood,
+              'city': address.city,
+              'state': address.state,
             },
           'installed_power_kwp': installedPowerKwp,
           'estimated_annual_generation': estimatedAnnualGeneration,
@@ -71,7 +71,7 @@ class SizingRepositoryService {
   }
 
   Future<PvgisValidationResult> lookupMonthlyHspWithPvgis({
-    required Client client,
+    required ProjectAddress address,
   }) async {
     try {
       final response = await _supabase.functions.invoke(
@@ -79,12 +79,12 @@ class SizingRepositoryService {
         body: {
           'mode': 'hsp_lookup',
           'address': {
-            'zip_code': client.zipCode,
-            'street': client.street,
-            'address_number': client.addressNumber,
-            'neighborhood': client.neighborhood,
-            'city': client.city,
-            'state': client.state,
+            'zip_code': address.zipCode,
+            'street': address.street,
+            'address_number': address.addressNumber,
+            'neighborhood': address.neighborhood,
+            'city': address.city,
+            'state': address.state,
           },
           'installed_power_kwp': 1,
           'estimated_annual_generation': 1,
@@ -114,6 +114,7 @@ class SizingRepositoryService {
   Future<void> createSizingProject({
     required int clientId,
     required String companyId,
+    required ProjectAddress address,
     required List<double> monthlyConsumption,
     required List<double> monthlyHsp,
     required double generationExtraPercent,
@@ -139,6 +140,7 @@ class SizingRepositoryService {
     await _supabase.from('projects').insert({
       'company_id': companyId,
       'client_id': clientId,
+      ...address.toMap(),
       'project_date': DateTime.now().toIso8601String().split('T').first,
       'status': 'Em negociação',
       'monthly_consumption': result.averageConsumption,
