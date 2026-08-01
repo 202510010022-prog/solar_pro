@@ -15,7 +15,7 @@ function getCorsHeaders(origin?: string): Record<string, string> {
   };
 }
 
-const corsHeaders = getCorsHeaders();
+let corsHeaders = getCorsHeaders();
 
 type PvgisPayload = {
   mode?: string;
@@ -35,6 +35,8 @@ type PvgisPayload = {
 };
 
 Deno.serve(async (request) => {
+  corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
+
   if (request.method === "OPTIONS") return jsonResponse({ ok: true });
   if (request.method !== "POST") {
     return jsonResponse({ error: "Metodo nao permitido." }, 405);
