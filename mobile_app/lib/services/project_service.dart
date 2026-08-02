@@ -37,7 +37,8 @@ class ProjectService {
 
     final rows = await _supabase
         .from('projects')
-        .select('*, clients(name)')
+        .select(
+            '*, clients(name), seller:profiles!projects_seller_id_fkey(name)')
         .eq('company_id', companyId)
         .order('id', ascending: false);
     final data = rows.map((row) => Map<String, dynamic>.from(row)).toList();
@@ -149,7 +150,9 @@ class ProjectService {
       final companyId = await currentCompanyId();
       final rows = await _supabase
           .from('projects')
-          .select('*, clients(name)')
+          .select(
+            '*, clients(name), seller:profiles!projects_seller_id_fkey(name)',
+          )
           .eq('company_id', companyId)
           .order('id', ascending: false);
       await _cache.saveJsonList(

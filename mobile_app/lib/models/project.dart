@@ -22,6 +22,8 @@ class ExtraMaterial {
 class Project {
   const Project({
     this.id,
+    this.sellerId,
+    this.sellerName,
     required this.clientId,
     required this.clientName,
     required this.address,
@@ -60,6 +62,8 @@ class Project {
   });
 
   final int? id;
+  final String? sellerId;
+  final String? sellerName;
   final int clientId;
   final String clientName;
   final ProjectAddress address;
@@ -98,8 +102,13 @@ class Project {
 
   factory Project.fromMap(Map<String, dynamic> map) {
     final client = map['clients'];
+    final seller = map['seller'];
+    final sellerId = '${map['seller_id'] ?? ''}'.trim();
+    final sellerName = seller is Map ? '${seller['name'] ?? ''}'.trim() : '';
     return Project(
       id: map['id'] is int ? map['id'] as int : int.tryParse('${map['id']}'),
+      sellerId: sellerId.isEmpty ? null : sellerId,
+      sellerName: sellerName.isEmpty ? null : sellerName,
       clientId: _int(map['client_id']),
       clientName: client is Map ? '${client['name'] ?? ''}' : '',
       address: ProjectAddress.fromMap(map),
