@@ -28,12 +28,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
   late Future<_ProjectsData> future;
   final search = TextEditingController();
   String statusFilter = 'Todos';
+  late bool showOnlyMine;
 
   @override
   void initState() {
     super.initState();
+    showOnlyMine = !_canManageAll;
     future = _loadProjects();
     search.addListener(() => setState(() {}));
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile?.id != widget.profile?.id) {
+      showOnlyMine = !_canManageAll;
+    }
   }
 
   @override
@@ -57,7 +67,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
           final selectedStatus = ProjectStatus.fromDbValue(statusFilter);
           final matchesStatus = statusFilter == 'Todos' ||
               (selectedStatus?.matches(project.status) ?? false);
-          return matchesSearch && matchesStatus;
+          final sellerId = widget.profile?.id;
+          final matchesSeller = !showOnlyMine ||
+              (sellerId != null && project.sellerId == sellerId);
+          return matchesSearch && matchesStatus && matchesSeller;
         }).toList();
         return RefreshIndicator(
           onRefresh: () async {
@@ -103,6 +116,26 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       onChanged: (value) =>
                           setState(() => statusFilter = value ?? 'Todos'),
                       decoration: const InputDecoration(labelText: 'Status'),
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<bool>(
+                      showSelectedIcon: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.person_rounded, size: 18),
+                          label: Text('Meus projetos'),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.groups_rounded, size: 18),
+                          label: Text('Todos'),
+                        ),
+                      ],
+                      selected: {showOnlyMine},
+                      onSelectionChanged: (selection) {
+                        setState(() => showOnlyMine = selection.first);
+                      },
                     ),
                   ],
                 ),
@@ -178,6 +211,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
     return map;
   }
+
+  bool get _canManageAll => widget.profile?.canManageAll == true;
 }
 
 class _ProjectTile extends StatefulWidget {
