@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/client.dart';
 import '../models/project.dart';
+import '../models/project_status.dart';
 import 'report_file_saver.dart';
 import 'solarpro_repository.dart';
 
@@ -307,7 +308,7 @@ class _ProjectReportRow {
   List<Object> get csvValues => [
         projectLabel,
         clientLabel,
-        project.status,
+        ProjectStatus.labelFor(project.status),
         project.projectValue,
         createdAt,
         project.systemPower,
@@ -319,7 +320,7 @@ class _ProjectReportRow {
   List<String> get pdfValues => [
         projectLabel,
         clientLabel,
-        project.status,
+        ProjectStatus.labelFor(project.status),
         money.format(project.projectValue),
         createdAt,
         '${number.format(project.systemPower)} kWp',

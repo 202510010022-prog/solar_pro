@@ -7,6 +7,7 @@ import '../models/app_profile.dart';
 import '../models/manual_payment.dart';
 import '../models/project.dart';
 import '../models/project_payment.dart';
+import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
@@ -38,21 +39,37 @@ class _DashboardPageState extends State<DashboardPage> {
     future = _loadDashboard();
   }
 
+  @override
+  void didUpdateWidget(covariant DashboardPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldCanUseFinancial = oldWidget.profile?.canUseFinancial == true;
+    final newCanUseFinancial = widget.profile?.canUseFinancial == true;
+    if (oldCanUseFinancial != newCanUseFinancial) {
+      setState(() {
+        future = _loadDashboard(cacheFirst: false);
+      });
+    }
+  }
+
   Future<_DashboardData> _loadDashboard({bool cacheFirst = true}) async {
     try {
       await widget.repository.syncOverdueManualPayments();
     } catch (_) {
       // Offline-first: alertas de cobranca continuam com o ultimo estado remoto.
     }
+    final canUseFinancial = widget.profile?.canUseFinancial == true;
     final results = await Future.wait([
       widget.repository.loadProjects(cacheFirst: cacheFirst),
-      widget.repository.loadProjectPayments(cacheFirst: cacheFirst),
+      if (canUseFinancial)
+        widget.repository.loadProjectPayments(cacheFirst: cacheFirst),
       widget.repository.loadOpenManualPayments(),
     ]);
     return _DashboardData(
       projects: results[0] as List<Project>,
-      projectPayments: results[1] as List<ProjectPayment>,
-      openPayments: results[2] as List<ManualPayment>,
+      projectPayments: canUseFinancial
+          ? results[1] as List<ProjectPayment>
+          : const <ProjectPayment>[],
+      openPayments: results[canUseFinancial ? 2 : 1] as List<ManualPayment>,
     );
   }
 
@@ -65,14 +82,19 @@ class _DashboardPageState extends State<DashboardPage> {
         final projects = data.projects;
         final projectPayments = data.projectPayments;
         final openPayments = data.openPayments;
-        final negotiating =
-            projects.where((item) => item.status == 'Em negociação').length;
-        final closed =
-            projects.where((item) => item.status == 'Fechado').length;
-        final completed =
-            projects.where((item) => item.status == 'Concluído').length;
-        final rejected =
-            projects.where((item) => item.status == 'Não aprovado').length;
+        final negotiating = projects
+            .where((item) => ProjectStatus.negotiating.matches(item.status))
+            .length;
+        final closed = projects
+            .where((item) => ProjectStatus.closed.matches(item.status))
+            .length;
+        final completed = projects
+            .where((item) => ProjectStatus.completed.matches(item.status))
+            .length;
+        final rejected = projects
+            .where((item) => ProjectStatus.rejected.matches(item.status))
+            .length;
+        final canUseFinancial = widget.profile?.canUseFinancial == true;
         final active = negotiating + closed;
         final converted = closed + completed;
         final today = DateTime.now();
@@ -86,24 +108,27 @@ class _DashboardPageState extends State<DashboardPage> {
               date.month == today.month;
         }).toList();
         final monthlyClosed = currentMonthProjects
-            .where((item) =>
-                item.status == 'Fechado' || item.status == 'Concluído')
+            .where((item) => ProjectStatus.isConverted(item.status))
             .fold<double>(0, (sum, item) => sum + item.projectValue);
+        final monthlyConvertedCount = currentMonthProjects
+            .where((item) => ProjectStatus.isConverted(item.status))
+            .length;
         final revenuePipeline = projects
-            .where((item) => item.status != 'Não aprovado')
+            .where((item) => ProjectStatus.isPipeline(item.status))
             .fold<double>(0, (sum, item) => sum + item.projectValue);
         final revenueClosed = projects
-            .where((item) =>
-                item.status == 'Fechado' || item.status == 'Concluído')
+            .where((item) => ProjectStatus.isConverted(item.status))
             .fold<double>(0, (sum, item) => sum + item.projectValue);
         final soldPower = projects
-            .where((item) =>
-                item.status == 'Fechado' || item.status == 'Concluído')
+            .where((item) => ProjectStatus.isConverted(item.status))
             .fold<double>(0, (sum, item) => sum + item.systemPower);
         final conversion =
             projects.isEmpty ? 0.0 : converted / projects.length * 100;
         final followUpProjects = _followUpProjects(projects);
-        final attentionProjects = _attentionProjects(projects);
+        final attentionProjects = _attentionProjects(
+          projects,
+          canUseFinancial: canUseFinancial,
+        );
         final recentProjects = projects.take(4).toList();
         final paymentsByProject = _paymentsByProject(projectPayments);
         final receivedThisMonth = projectPayments
@@ -133,7 +158,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() => future = _loadDashboard(cacheFirst: false));
+            setState(() {
+              future = _loadDashboard(cacheFirst: false);
+            });
             await future;
           },
           child: ListView(
@@ -186,7 +213,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                   (width) => _Kpi(
                         width: width,
-                        title: 'Em negociação',
+                        title: ProjectStatus.negotiating.dashboardLabel,
                         value: '$negotiating',
                         icon: Icons.forum_rounded,
                         color: AppTheme.orange,
@@ -194,7 +221,9 @@ class _DashboardPageState extends State<DashboardPage> {
                   (width) => _Kpi(
                         width: width,
                         title: 'Convertidos no mês',
-                        value: money.format(monthlyClosed),
+                        value: canUseFinancial
+                            ? money.format(monthlyClosed)
+                            : '$monthlyConvertedCount',
                         icon: Icons.check_circle_rounded,
                         color: AppTheme.green,
                       ),
@@ -215,20 +244,23 @@ class _DashboardPageState extends State<DashboardPage> {
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  _WideKpi(
-                    title: 'Receita prevista',
-                    value: money.format(revenuePipeline),
-                    subtitle: 'Pipeline válido',
-                    icon: Icons.trending_up_rounded,
-                    color: AppTheme.green,
-                  ),
-                  _WideKpi(
-                    title: 'Receita fechada',
-                    value: money.format(revenueClosed),
-                    subtitle: 'Aprovados + concluídos',
-                    icon: Icons.savings_rounded,
-                    color: AppTheme.primaryBlue,
-                  ),
+                  if (canUseFinancial) ...[
+                    _WideKpi(
+                      title: 'Receita prevista',
+                      value: money.format(revenuePipeline),
+                      subtitle: 'Pipeline válido',
+                      icon: Icons.trending_up_rounded,
+                      color: AppTheme.green,
+                    ),
+                    _WideKpi(
+                      title: 'Receita fechada',
+                      value: money.format(revenueClosed),
+                      subtitle:
+                          '${ProjectStatus.closed.dashboardLabel} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
+                      icon: Icons.savings_rounded,
+                      color: AppTheme.primaryBlue,
+                    ),
+                  ],
                   _WideKpi(
                     title: 'Taxa de conversão',
                     value: '${conversion.toStringAsFixed(1)}%',
@@ -239,20 +271,23 @@ class _DashboardPageState extends State<DashboardPage> {
                   _WideKpi(
                     title: 'Potência vendida',
                     value: '${soldPower.toStringAsFixed(2)} kWp',
-                    subtitle: 'Aprovados + concluídos',
+                    subtitle:
+                        '${ProjectStatus.closed.dashboardLabel} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
                     icon: Icons.solar_power_rounded,
                     color: AppTheme.neonBlue,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              FinancialSummaryCard(
-                receivedThisMonth: receivedThisMonth,
-                pending: pendingAmount,
-                overdue: overdueAmount,
-                money: money,
-                onOpenBilling: () => widget.onOpenTab(4),
-              ),
+              if (canUseFinancial) ...[
+                const SizedBox(height: 14),
+                FinancialSummaryCard(
+                  receivedThisMonth: receivedThisMonth,
+                  pending: pendingAmount,
+                  overdue: overdueAmount,
+                  money: money,
+                  onOpenBilling: () => widget.onOpenTab(4),
+                ),
+              ],
               const SizedBox(height: 14),
               _StatusDistribution(
                 negotiating: negotiating,
@@ -264,6 +299,7 @@ class _DashboardPageState extends State<DashboardPage> {
               _AttentionCard(
                 projects: attentionProjects,
                 money: money,
+                canUseFinancial: canUseFinancial,
                 onOpenProjects: () => widget.onOpenTab(2),
               ),
               const SizedBox(height: 10),
@@ -275,16 +311,20 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  List<Project> _attentionProjects(List<Project> projects) {
+  List<Project> _attentionProjects(
+    List<Project> projects, {
+    required bool canUseFinancial,
+  }) {
     final now = DateTime.now();
     final items = [...projects];
     items.sort((a, b) {
-      final aScore = _attentionScore(a, now);
-      final bScore = _attentionScore(b, now);
+      final aScore = _attentionScore(a, now, canUseFinancial: canUseFinancial);
+      final bScore = _attentionScore(b, now, canUseFinancial: canUseFinancial);
       return bScore.compareTo(aScore);
     });
     return items
-        .where((item) => _attentionScore(item, now) > 0)
+        .where((item) =>
+            _attentionScore(item, now, canUseFinancial: canUseFinancial) > 0)
         .take(4)
         .toList();
   }
@@ -292,7 +332,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Project> _followUpProjects(List<Project> projects) {
     final now = DateTime.now();
     final items = projects.where((project) {
-      if (project.status != 'Em negociação') return false;
+      if (!ProjectStatus.negotiating.matches(project.status)) return false;
       final reference = project.updatedAt ?? _parseDate(project.projectDate);
       if (reference == null) return false;
       return now.difference(reference).inDays >= 3;
@@ -312,7 +352,9 @@ class _DashboardPageState extends State<DashboardPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Follow-up criado em Mensagens.')),
       );
-      setState(() => future = _loadDashboard(cacheFirst: false));
+      setState(() {
+        future = _loadDashboard(cacheFirst: false);
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -323,12 +365,18 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  int _attentionScore(Project project, DateTime now) {
+  int _attentionScore(
+    Project project,
+    DateTime now, {
+    required bool canUseFinancial,
+  }) {
     var score = 0;
     final date = _parseDate(project.projectDate);
     final age = date == null ? 0 : now.difference(date).inDays;
-    if (project.status == 'Em negociação' && age >= 7) score += 3;
-    if (project.projectValue <= 0) score += 2;
+    if (ProjectStatus.negotiating.matches(project.status) && age >= 7) {
+      score += 3;
+    }
+    if (canUseFinancial && project.projectValue <= 0) score += 2;
     if (project.paybackYears >= 6) score += 1;
     if (project.systemPower <= 0) score += 1;
     return score;
@@ -880,11 +928,13 @@ class _AttentionCard extends StatelessWidget {
   const _AttentionCard({
     required this.projects,
     required this.money,
+    required this.canUseFinancial,
     required this.onOpenProjects,
   });
 
   final List<Project> projects;
   final NumberFormat money;
+  final bool canUseFinancial;
   final VoidCallback onOpenProjects;
 
   @override
@@ -911,7 +961,9 @@ class _AttentionCard extends StatelessWidget {
               (project) => _ProjectMiniTile(
                 project: project,
                 subtitle: _attentionReason(project),
-                trailing: money.format(project.projectValue),
+                trailing: canUseFinancial
+                    ? money.format(project.projectValue)
+                    : project.status,
                 color: AppTheme.orange,
               ),
             ),
@@ -923,10 +975,10 @@ class _AttentionCard extends StatelessWidget {
   String _attentionReason(Project project) {
     final date = DateTime.tryParse(project.projectDate);
     final age = date == null ? 0 : DateTime.now().difference(date).inDays;
-    if (project.status == 'Em negociação' && age >= 7) {
-      return 'Em negociação há $age dias';
+    if (ProjectStatus.negotiating.matches(project.status) && age >= 7) {
+      return '${ProjectStatus.negotiating.label} há $age dias';
     }
-    if (project.projectValue <= 0) {
+    if (canUseFinancial && project.projectValue <= 0) {
       return 'Valor do projeto pendente';
     }
     if (project.paybackYears >= 6) {
@@ -935,7 +987,7 @@ class _AttentionCard extends StatelessWidget {
     if (project.systemPower <= 0) {
       return 'Dimensionamento incompleto';
     }
-    return project.status;
+    return ProjectStatus.labelFor(project.status);
   }
 }
 
@@ -971,12 +1023,10 @@ class _RecentActivityCard extends StatelessWidget {
   }
 
   static Color _statusColor(String status) {
-    return switch (status) {
-      'Fechado' => AppTheme.green,
-      'Concluído' => AppTheme.neonBlue,
-      'Não aprovado' => AppTheme.purple,
-      _ => AppTheme.orange,
-    };
+    if (ProjectStatus.closed.matches(status)) return AppTheme.green;
+    if (ProjectStatus.completed.matches(status)) return AppTheme.neonBlue;
+    if (ProjectStatus.rejected.matches(status)) return AppTheme.purple;
+    return AppTheme.orange;
   }
 }
 
@@ -1126,22 +1176,22 @@ class _StatusDistribution extends StatelessWidget {
           ProjectDistributionVerticalChart(
             items: [
               ProjectDistributionBarItem(
-                label: 'Em negociação',
+                label: ProjectStatus.negotiating.dashboardLabel,
                 value: negotiating,
                 color: AppTheme.orange,
               ),
               ProjectDistributionBarItem(
-                label: 'Aprovados',
+                label: ProjectStatus.closed.dashboardLabel,
                 value: closed,
                 color: AppTheme.green,
               ),
               ProjectDistributionBarItem(
-                label: 'Concluídos',
+                label: ProjectStatus.completed.dashboardLabel,
                 value: completed,
                 color: AppTheme.neonBlue,
               ),
               ProjectDistributionBarItem(
-                label: 'Não aprovados',
+                label: ProjectStatus.rejected.dashboardLabel,
                 value: rejected,
                 color: AppTheme.purple,
               ),

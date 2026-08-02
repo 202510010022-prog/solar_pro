@@ -2,19 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/project.dart';
 import '../models/app_profile.dart';
+import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 import 'project_details_page.dart';
 import 'project_edit_page.dart';
-
-const projectStatuses = [
-  'Em negociação',
-  'Fechado',
-  'Concluído',
-  'Não aprovado'
-];
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage(
@@ -62,8 +56,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
         }).toList();
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() =>
-                future = widget.repository.loadProjects(cacheFirst: false));
+            setState(() {
+              future = widget.repository.loadProjects(cacheFirst: false);
+            });
             await future;
           },
           child: ListView(
@@ -92,9 +87,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: statusFilter,
-                      items: const ['Todos', ...projectStatuses]
-                          .map((item) =>
-                              DropdownMenuItem(value: item, child: Text(item)))
+                      items: ['Todos', ...ProjectStatus.dbValues]
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(ProjectStatus.labelFor(item)),
+                            ),
+                          )
                           .toList(),
                       onChanged: (value) =>
                           setState(() => statusFilter = value ?? 'Todos'),
@@ -141,7 +140,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   void _reload() {
-    setState(() => future = widget.repository.loadProjects(cacheFirst: false));
+    setState(() {
+      future = widget.repository.loadProjects(cacheFirst: false);
+    });
   }
 }
 
@@ -273,11 +274,16 @@ class _ProjectTileState extends State<_ProjectTile> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: projectStatuses.contains(status)
+            initialValue: ProjectStatus.dbValues.contains(status)
                 ? status
-                : projectStatuses.first,
-            items: projectStatuses
-                .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                : ProjectStatus.negotiating.dbValue,
+            items: ProjectStatus.dbValues
+                .map(
+                  (item) => DropdownMenuItem(
+                    value: item,
+                    child: Text(ProjectStatus.labelFor(item)),
+                  ),
+                )
                 .toList(),
             onChanged: (value) async {
               if (value == null || widget.project.id == null) return;
@@ -327,13 +333,11 @@ class _ProjectTileState extends State<_ProjectTile> {
   }
 
   double _progressFor(String status) {
-    return switch (status) {
-      'Concluído' => 1.0,
-      'Fechado' => 0.75,
-      'Em negociação' => 0.45,
-      'Não aprovado' => 0.08,
-      _ => 0.25,
-    };
+    if (ProjectStatus.completed.matches(status)) return 1.0;
+    if (ProjectStatus.closed.matches(status)) return 0.75;
+    if (ProjectStatus.negotiating.matches(status)) return 0.45;
+    if (ProjectStatus.rejected.matches(status)) return 0.08;
+    return 0.25;
   }
 
   Future<void> _delete(BuildContext context) async {

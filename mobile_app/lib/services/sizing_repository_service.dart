@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/app_subscription.dart';
 import '../models/project_address.dart';
+import '../models/project_status.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
 
@@ -142,7 +143,7 @@ class SizingRepositoryService {
       'client_id': clientId,
       ...address.toMap(),
       'project_date': DateTime.now().toIso8601String().split('T').first,
-      'status': 'Em negociação',
+      'status': ProjectStatus.negotiating.dbValue,
       'monthly_consumption': result.averageConsumption,
       'sun_hours': result.averageHsp,
       'monthly_consumptions': jsonEncode(monthlyConsumption),

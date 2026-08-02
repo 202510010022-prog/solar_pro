@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'project_address.dart';
+import 'project_status.dart';
 
 class ExtraMaterial {
   const ExtraMaterial({required this.name, required this.value});
@@ -101,7 +102,7 @@ class Project {
       clientName: client is Map ? '${client['name'] ?? ''}' : '',
       address: ProjectAddress.fromMap(map),
       projectDate: '${map['project_date'] ?? ''}',
-      status: '${map['status'] ?? 'Em negociação'}',
+      status: ProjectStatus.fallbackDbValue('${map['status'] ?? ''}'),
       averageConsumption: _double(map['average_consumption']),
       averageHsp: _double(map['average_hsp']),
       annualConsumption: _double(map['annual_consumption']),

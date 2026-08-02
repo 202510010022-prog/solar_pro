@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../models/client.dart';
 import '../models/project.dart';
+import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
@@ -45,7 +46,9 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
       appBar: AppBar(title: const Text('Detalhes do cliente')),
       body: RefreshIndicator(
         onRefresh: () async {
-          setState(() => projectsFuture = _loadProjects());
+          setState(() {
+            projectsFuture = _loadProjects();
+          });
           await projectsFuture;
         },
         child: ListView(
@@ -145,7 +148,8 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
                                         ProjectDetailsPage(project: project)),
                               ),
                               title: Text(
-                                  '#${project.id ?? '-'} • ${project.status}'),
+                                '#${project.id ?? '-'} • ${ProjectStatus.labelFor(project.status)}',
+                              ),
                               subtitle: Text(
                                 '${project.systemPower.toStringAsFixed(2)} kWp • ${project.moduleCount} módulos',
                                 style: const TextStyle(color: AppTheme.muted),

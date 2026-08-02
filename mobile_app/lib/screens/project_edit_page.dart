@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/project.dart';
+import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
-import 'projects_page.dart';
 
 class ProjectEditPage extends StatefulWidget {
   const ProjectEditPage({
@@ -22,9 +22,9 @@ class ProjectEditPage extends StatefulWidget {
 }
 
 class _ProjectEditPageState extends State<ProjectEditPage> {
-  late String status = projectStatuses.contains(widget.project.status)
+  late String status = ProjectStatus.dbValues.contains(widget.project.status)
       ? widget.project.status
-      : projectStatuses.first;
+      : ProjectStatus.negotiating.dbValue;
   late final laborCost =
       TextEditingController(text: widget.project.laborCost.toStringAsFixed(2));
   late final moduleUnitCost = TextEditingController(
@@ -121,9 +121,13 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: status,
-                  items: projectStatuses
-                      .map((item) =>
-                          DropdownMenuItem(value: item, child: Text(item)))
+                  items: ProjectStatus.dbValues
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(ProjectStatus.labelFor(item)),
+                        ),
+                      )
                       .toList(),
                   onChanged: (value) =>
                       setState(() => status = value ?? status),

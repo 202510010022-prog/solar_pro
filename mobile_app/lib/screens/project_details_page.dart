@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/project.dart';
+import '../models/project_status.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
 
@@ -41,7 +42,7 @@ class ProjectDetailsPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${project.status} • ${project.projectDate}',
+            '${ProjectStatus.labelFor(project.status)} • ${project.projectDate}',
             style: const TextStyle(color: AppTheme.muted),
           ),
           const SizedBox(height: 16),

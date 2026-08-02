@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../models/project.dart';
+import '../models/project_status.dart';
 import '../theme/app_theme.dart';
 import 'neon_card.dart';
 
@@ -16,26 +17,26 @@ class ProjectStatusChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _ProjectStatusItem(
-        label: 'Aprovados',
-        value: _count('Fechado'),
+        label: ProjectStatus.closed.dashboardLabel,
+        value: _count(ProjectStatus.closed.dbValue),
         color: AppTheme.green,
         icon: Icons.check_circle_rounded,
       ),
       _ProjectStatusItem(
-        label: 'Concluídos',
-        value: _count('Concluído'),
+        label: ProjectStatus.completed.dashboardLabel,
+        value: _count(ProjectStatus.completed.dbValue),
         color: AppTheme.neonBlue,
         icon: Icons.verified_rounded,
       ),
       _ProjectStatusItem(
-        label: 'Em negociação',
-        value: _count('Em negociação'),
+        label: ProjectStatus.negotiating.dashboardLabel,
+        value: _count(ProjectStatus.negotiating.dbValue),
         color: AppTheme.orange,
         icon: Icons.forum_rounded,
       ),
       _ProjectStatusItem(
-        label: 'Não aprovados',
-        value: _count('Não aprovado'),
+        label: ProjectStatus.rejected.dashboardLabel,
+        value: _count(ProjectStatus.rejected.dbValue),
         color: AppTheme.purple,
         icon: Icons.cancel_rounded,
       ),
