@@ -278,6 +278,14 @@ class _ProjectTileState extends State<_ProjectTile> {
                           style: const TextStyle(
                               color: AppTheme.muted, fontSize: 12),
                         ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Vendedor: ${widget.project.sellerName?.trim().isNotEmpty == true ? widget.project.sellerName : 'não atribuído'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppTheme.muted, fontSize: 12),
+                        ),
                       ],
                     ),
                   ),

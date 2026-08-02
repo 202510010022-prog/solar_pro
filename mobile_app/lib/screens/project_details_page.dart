@@ -84,6 +84,8 @@ class ProjectDetailsPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
+          _ProjectSellerCard(project: project),
+          const SizedBox(height: 14),
           _ProjectAddressCard(project: project),
           const SizedBox(height: 14),
           NeonCard(
@@ -204,6 +206,53 @@ class ProjectDetailsPage extends StatelessWidget {
 
   double _at(List<double> values, int index) =>
       index < values.length ? values[index] : 0;
+}
+
+class _ProjectSellerCard extends StatelessWidget {
+  const _ProjectSellerCard({required this.project});
+
+  final Project project;
+
+  @override
+  Widget build(BuildContext context) {
+    final sellerName = project.sellerName?.trim();
+    final hasSeller = sellerName != null && sellerName.isNotEmpty;
+
+    return NeonCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.10),
+            child: const Icon(
+              Icons.badge_rounded,
+              color: AppTheme.primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Vendedor responsável',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  hasSeller ? sellerName : 'Vendedor não atribuído',
+                  style: TextStyle(
+                    color: hasSeller ? AppTheme.text : AppTheme.muted,
+                    fontWeight: hasSeller ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProjectAddressCard extends StatelessWidget {
