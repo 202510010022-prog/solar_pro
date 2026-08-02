@@ -26,7 +26,9 @@ class _TeamUsersPageState extends State<TeamUsersPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => future = widget.repository.loadTeamProfiles());
+    setState(() {
+      future = widget.repository.loadTeamProfiles();
+    });
     await future;
   }
 

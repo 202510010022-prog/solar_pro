@@ -25,7 +25,9 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   void _reload() {
-    setState(() => future = widget.repository.loadAppMessages());
+    setState(() {
+      future = widget.repository.loadAppMessages();
+    });
   }
 
   Future<void> _markRead(AppMessage message) async {

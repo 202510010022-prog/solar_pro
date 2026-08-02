@@ -41,7 +41,9 @@ class _BetaAdminPageState extends State<BetaAdminPage> {
   }
 
   Future<void> _refresh() async {
-    setState(() => future = _load());
+    setState(() {
+      future = _load();
+    });
     await future;
   }
 
