@@ -27,6 +27,7 @@ class Project {
     required this.address,
     required this.projectDate,
     required this.status,
+    required this.rejectionReason,
     required this.averageConsumption,
     required this.averageHsp,
     required this.annualConsumption,
@@ -64,6 +65,7 @@ class Project {
   final ProjectAddress address;
   final String projectDate;
   final String status;
+  final String rejectionReason;
   final double averageConsumption;
   final double averageHsp;
   final double annualConsumption;
@@ -103,6 +105,7 @@ class Project {
       address: ProjectAddress.fromMap(map),
       projectDate: '${map['project_date'] ?? ''}',
       status: ProjectStatus.fallbackDbValue('${map['status'] ?? ''}'),
+      rejectionReason: '${map['rejection_reason'] ?? ''}',
       averageConsumption: _double(map['average_consumption']),
       averageHsp: _double(map['average_hsp']),
       annualConsumption: _double(map['annual_consumption']),
@@ -136,7 +139,10 @@ class Project {
   }
 
   Map<String, dynamic> toStatusMap() {
-    return {'status': status};
+    return {
+      'status': status,
+      'rejection_reason': rejectionReason,
+    };
   }
 
   static int _int(dynamic value) {

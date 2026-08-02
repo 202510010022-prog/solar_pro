@@ -7,6 +7,7 @@ import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/rejection_reason_dialog.dart';
 import 'project_details_page.dart';
 import 'project_edit_page.dart';
 
@@ -122,7 +123,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                         mainAxisExtent:
-                            widget.profile?.canManageAll == true ? 276 : 196,
+                            widget.profile?.canManageAll == true ? 318 : 244,
                       ),
                       itemBuilder: (context, index) => _ProjectTile(
                         project: filtered[index],
@@ -166,6 +167,18 @@ class _ProjectTile extends StatefulWidget {
 
 class _ProjectTileState extends State<_ProjectTile> {
   late String status = ProjectStatus.fallbackDbValue(widget.project.status);
+  late String rejectionReason = widget.project.rejectionReason;
+
+  @override
+  void didUpdateWidget(covariant _ProjectTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.project.id != widget.project.id ||
+        oldWidget.project.status != widget.project.status ||
+        oldWidget.project.rejectionReason != widget.project.rejectionReason) {
+      status = ProjectStatus.fallbackDbValue(widget.project.status);
+      rejectionReason = widget.project.rejectionReason;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -287,6 +300,7 @@ class _ProjectTileState extends State<_ProjectTile> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
+            key: ValueKey('project-status-${widget.project.id}-$status'),
             initialValue: ProjectStatus.fallbackDbValue(status),
             items: statusOptions
                 .map(
@@ -296,36 +310,14 @@ class _ProjectTileState extends State<_ProjectTile> {
                   ),
                 )
                 .toList(),
-            onChanged: (value) async {
-              if (value == null || widget.project.id == null) return;
-              setState(() => status = value);
-              try {
-                await widget.repository
-                    .updateProjectStatus(widget.project.id!, value);
-                widget.onChanged();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Status atualizado com sucesso.')),
-                  );
-                }
-              } catch (error) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        friendlyNetworkError(
-                          error,
-                          fallback: 'Não foi possível atualizar o status.',
-                        ),
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
+            onChanged: _changeStatus,
             decoration: const InputDecoration(labelText: 'Status'),
           ),
+          if (ProjectStatus.rejected.matches(status) &&
+              rejectionReason.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _RejectionReasonPreview(reason: rejectionReason),
+          ],
           if (isManualCorrection) ...[
             const SizedBox(height: 8),
             const _ManualStatusCorrectionHint(),
@@ -345,6 +337,65 @@ class _ProjectTileState extends State<_ProjectTile> {
         ],
       ),
     );
+  }
+
+  Future<void> _changeStatus(String? value) async {
+    if (value == null || widget.project.id == null) return;
+
+    final previousStatus = status;
+    final previousReason = rejectionReason;
+    var nextReason = '';
+
+    if (ProjectStatus.rejected.matches(value)) {
+      final reason = await showRejectionReasonDialog(
+        context,
+        initialReason: rejectionReason,
+      );
+      if (!mounted || reason == null) {
+        setState(() {
+          status = previousStatus;
+          rejectionReason = previousReason;
+        });
+        return;
+      }
+      nextReason = reason;
+    }
+
+    setState(() {
+      status = value;
+      rejectionReason = nextReason;
+    });
+
+    try {
+      await widget.repository.updateProjectStatus(
+        widget.project.id!,
+        value,
+        rejectionReason: nextReason,
+      );
+      widget.onChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status atualizado com sucesso.')),
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          status = previousStatus;
+          rejectionReason = previousReason;
+        });
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyNetworkError(
+              error,
+              fallback: 'Não foi possível atualizar o status.',
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   double _progressFor(String status) {
@@ -421,6 +472,43 @@ class _ManualStatusCorrectionHint extends StatelessWidget {
               style: TextStyle(
                 color: AppTheme.text,
                 fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RejectionReasonPreview extends StatelessWidget {
+  const _RejectionReasonPreview({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.purple.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppTheme.purple.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              color: AppTheme.purple, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Motivo: $reason',
+              style: const TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
             ),

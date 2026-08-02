@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/project.dart';
+import '../models/project_status.dart';
 import 'cache_service.dart';
 
 class ProjectService {
@@ -43,10 +44,17 @@ class ProjectService {
     return data.map(Project.fromMap).toList();
   }
 
-  Future<void> updateProjectStatus(int projectId, String status) async {
+  Future<void> updateProjectStatus(
+    int projectId,
+    String status, {
+    String? rejectionReason,
+  }) async {
     await ensureCompanyCanWrite('alterar projetos');
     await _supabase.from('projects').update({
       'status': status,
+      'rejection_reason': ProjectStatus.rejected.matches(status)
+          ? (rejectionReason ?? '').trim()
+          : '',
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', projectId);
     await refreshProjectsInBackground();
@@ -64,10 +72,14 @@ class ProjectService {
     required double energyTariff,
     required double modulePower,
     required double paybackYears,
+    String? rejectionReason,
   }) async {
     await ensureCompanyCanWrite('editar projetos');
     await _supabase.from('projects').update({
       'status': status,
+      'rejection_reason': ProjectStatus.rejected.matches(status)
+          ? (rejectionReason ?? '').trim()
+          : '',
       'project_value': projectValue,
       'labor_cost': laborCost,
       'module_unit_cost': moduleUnitCost,

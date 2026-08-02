@@ -7,6 +7,7 @@ import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/rejection_reason_dialog.dart';
 
 class ProjectEditPage extends StatefulWidget {
   const ProjectEditPage({
@@ -26,6 +27,7 @@ class ProjectEditPage extends StatefulWidget {
 
 class _ProjectEditPageState extends State<ProjectEditPage> {
   late String status = ProjectStatus.fallbackDbValue(widget.project.status);
+  late String rejectionReason = widget.project.rejectionReason;
   late final laborCost =
       TextEditingController(text: widget.project.laborCost.toStringAsFixed(2));
   late final moduleUnitCost = TextEditingController(
@@ -61,11 +63,18 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
   Future<void> save() async {
     final projectId = widget.project.id;
     if (projectId == null) return;
+    if (ProjectStatus.rejected.matches(status) &&
+        rejectionReason.trim().isEmpty) {
+      final reason = await showRejectionReasonDialog(context);
+      if (!mounted || reason == null) return;
+      setState(() => rejectionReason = reason);
+    }
     setState(() => saving = true);
     try {
       await widget.repository.updateProjectSummary(
         projectId: projectId,
         status: status,
+        rejectionReason: rejectionReason,
         projectValue: _totalValue(),
         laborCost: _number(laborCost.text),
         moduleUnitCost: _number(moduleUnitCost.text),
@@ -132,6 +141,7 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
             child: Column(
               children: [
                 DropdownButtonFormField<String>(
+                  key: ValueKey('edit-status-$status'),
                   initialValue: status,
                   items: statusOptions
                       .map(
@@ -141,10 +151,14 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) =>
-                      setState(() => status = value ?? status),
+                  onChanged: _selectStatus,
                   decoration: const InputDecoration(labelText: 'Status'),
                 ),
+                if (ProjectStatus.rejected.matches(status) &&
+                    rejectionReason.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _RejectionReasonPreview(reason: rejectionReason),
+                ],
                 if (isManualCorrection) ...[
                   const SizedBox(height: 8),
                   const _ManualStatusCorrectionHint(),
@@ -254,6 +268,31 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
     );
   }
 
+  Future<void> _selectStatus(String? value) async {
+    if (value == null) return;
+    if (ProjectStatus.rejected.matches(value)) {
+      final reason = await showRejectionReasonDialog(
+        context,
+        initialReason: rejectionReason,
+      );
+      if (!mounted) return;
+      if (reason == null) {
+        setState(() => status = status);
+        return;
+      }
+      setState(() {
+        status = value;
+        rejectionReason = reason;
+      });
+      return;
+    }
+
+    setState(() {
+      status = value;
+      rejectionReason = '';
+    });
+  }
+
   double _number(String value) {
     final text = value.trim();
     if (text.contains(',')) {
@@ -349,6 +388,43 @@ class _ManualStatusCorrectionHint extends StatelessWidget {
               style: TextStyle(
                 color: AppTheme.text,
                 fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RejectionReasonPreview extends StatelessWidget {
+  const _RejectionReasonPreview({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.purple.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppTheme.purple.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              color: AppTheme.purple, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Motivo: $reason',
+              style: const TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
             ),

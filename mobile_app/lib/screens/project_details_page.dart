@@ -45,6 +45,11 @@ class ProjectDetailsPage extends StatelessWidget {
             '${ProjectStatus.labelFor(project.status)} • ${project.projectDate}',
             style: const TextStyle(color: AppTheme.muted),
           ),
+          if (ProjectStatus.rejected.matches(project.status) &&
+              project.rejectionReason.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _RejectionReasonCard(reason: project.rejectionReason),
+          ],
           const SizedBox(height: 16),
           Wrap(
             spacing: 12,
@@ -229,6 +234,48 @@ class _ProjectAddressCard extends StatelessWidget {
                     style: const TextStyle(color: AppTheme.muted),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RejectionReasonCard extends StatelessWidget {
+  const _RejectionReasonCard({required this.reason});
+
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeonCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            backgroundColor: AppTheme.purple.withValues(alpha: 0.12),
+            child: const Icon(Icons.cancel_rounded, color: AppTheme.purple),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Motivo da não aprovação',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  reason.trim(),
+                  style: const TextStyle(
+                    color: AppTheme.text,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),

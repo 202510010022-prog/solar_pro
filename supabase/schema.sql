@@ -133,6 +133,7 @@ create table if not exists public.projects (
     address_complement text not null default '',
     project_date text not null,
     status text not null default 'Em negociação',
+    rejection_reason text not null default '',
     monthly_consumption numeric not null default 0,
     sun_hours numeric not null default 0,
     monthly_consumptions text not null default '[]',

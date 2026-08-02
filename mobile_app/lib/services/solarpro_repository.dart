@@ -184,8 +184,16 @@ class SolarProRepository {
 
   Future<CepLookupResult> lookupCep(String cep) => _clients.lookupCep(cep);
 
-  Future<void> updateProjectStatus(int projectId, String status) =>
-      _projects.updateProjectStatus(projectId, status);
+  Future<void> updateProjectStatus(
+    int projectId,
+    String status, {
+    String? rejectionReason,
+  }) =>
+      _projects.updateProjectStatus(
+        projectId,
+        status,
+        rejectionReason: rejectionReason,
+      );
 
   Future<void> updateProjectSummary({
     required int projectId,
@@ -199,6 +207,7 @@ class SolarProRepository {
     required double energyTariff,
     required double modulePower,
     required double paybackYears,
+    String? rejectionReason,
   }) =>
       _projects.updateProjectSummary(
         projectId: projectId,
@@ -212,6 +221,7 @@ class SolarProRepository {
         energyTariff: energyTariff,
         modulePower: modulePower,
         paybackYears: paybackYears,
+        rejectionReason: rejectionReason,
       );
 
   Future<void> updateProjectFinancialPlan({
