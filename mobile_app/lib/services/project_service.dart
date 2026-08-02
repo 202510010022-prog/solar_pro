@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/project.dart';
@@ -50,6 +51,7 @@ class ProjectService {
     String? rejectionReason,
   }) async {
     await ensureCompanyCanWrite('alterar projetos');
+    final previous = await _loadProjectStatusLogData(projectId);
     await _supabase.from('projects').update({
       'status': status,
       'rejection_reason': ProjectStatus.rejected.matches(status)
@@ -57,6 +59,12 @@ class ProjectService {
           : '',
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', projectId);
+    await _insertStatusChangeHistory(
+      projectId: projectId,
+      previous: previous,
+      nextStatus: status,
+      rejectionReason: rejectionReason,
+    );
     await refreshProjectsInBackground();
   }
 
@@ -75,6 +83,7 @@ class ProjectService {
     String? rejectionReason,
   }) async {
     await ensureCompanyCanWrite('editar projetos');
+    final previous = await _loadProjectStatusLogData(projectId);
     await _supabase.from('projects').update({
       'status': status,
       'rejection_reason': ProjectStatus.rejected.matches(status)
@@ -91,6 +100,12 @@ class ProjectService {
       'payback_years': paybackYears,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', projectId);
+    await _insertStatusChangeHistory(
+      projectId: projectId,
+      previous: previous,
+      nextStatus: status,
+      rejectionReason: rejectionReason,
+    );
     await refreshProjectsInBackground();
   }
 
@@ -144,5 +159,78 @@ class ProjectService {
     } catch (_) {
       // Offline-first: cache remains valid when network is unavailable.
     }
+  }
+
+  Future<_ProjectStatusLogData?> _loadProjectStatusLogData(
+    int projectId,
+  ) async {
+    try {
+      final row = await _supabase
+          .from('projects')
+          .select('id, status, clients(name)')
+          .eq('id', projectId)
+          .maybeSingle();
+      if (row == null) return null;
+      return _ProjectStatusLogData.fromMap(Map<String, dynamic>.from(row));
+    } catch (error) {
+      debugPrint('Falha ao carregar projeto para historico: $error');
+      return null;
+    }
+  }
+
+  Future<void> _insertStatusChangeHistory({
+    required int projectId,
+    required _ProjectStatusLogData? previous,
+    required String nextStatus,
+    required String? rejectionReason,
+  }) async {
+    final oldStatus = previous?.status;
+    if (oldStatus != null &&
+        ProjectStatus.fromDbValue(oldStatus) ==
+            ProjectStatus.fromDbValue(nextStatus)) {
+      return;
+    }
+
+    final clientName = (previous?.clientName ?? '').trim();
+    final oldLabel = oldStatus == null
+        ? 'status anterior'
+        : ProjectStatus.labelFor(oldStatus);
+    final newLabel = ProjectStatus.labelFor(nextStatus);
+    final reason = (rejectionReason ?? '').trim();
+    final reasonText =
+        ProjectStatus.rejected.matches(nextStatus) && reason.isNotEmpty
+            ? ' ($reason)'
+            : '';
+    final projectLabel = clientName.isEmpty
+        ? 'Projeto #$projectId'
+        : 'Projeto #$projectId ($clientName)';
+
+    try {
+      await _supabase.from('action_history').insert({
+        'action': 'project_status_updated',
+        'entity': 'project',
+        'detail': '$projectLabel: $oldLabel → $newLabel$reasonText',
+      });
+    } catch (error) {
+      debugPrint('Falha ao registrar historico de status: $error');
+    }
+  }
+}
+
+class _ProjectStatusLogData {
+  const _ProjectStatusLogData({
+    required this.status,
+    required this.clientName,
+  });
+
+  final String status;
+  final String clientName;
+
+  factory _ProjectStatusLogData.fromMap(Map<String, dynamic> map) {
+    final client = map['clients'];
+    return _ProjectStatusLogData(
+      status: '${map['status'] ?? ''}',
+      clientName: client is Map ? '${client['name'] ?? ''}' : '',
+    );
   }
 }
