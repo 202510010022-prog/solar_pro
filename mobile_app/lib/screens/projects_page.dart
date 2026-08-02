@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../models/project.dart';
 import '../models/app_profile.dart';
+import '../models/project_payment.dart';
 import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/payment_status_badge.dart';
 import '../widgets/rejection_reason_dialog.dart';
 import 'project_details_page.dart';
 import 'project_edit_page.dart';
@@ -23,14 +25,14 @@ class ProjectsPage extends StatefulWidget {
 }
 
 class _ProjectsPageState extends State<ProjectsPage> {
-  late Future<List<Project>> future;
+  late Future<_ProjectsData> future;
   final search = TextEditingController();
   String statusFilter = 'Todos';
 
   @override
   void initState() {
     super.initState();
-    future = widget.repository.loadProjects();
+    future = _loadProjects();
     search.addListener(() => setState(() {}));
   }
 
@@ -42,10 +44,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Project>>(
+    return FutureBuilder<_ProjectsData>(
       future: future,
       builder: (context, snapshot) {
-        final projects = snapshot.data ?? [];
+        final data = snapshot.data ?? const _ProjectsData();
+        final projects = data.projects;
         final filtered = projects.where((project) {
           final query = search.text.trim().toLowerCase();
           final matchesSearch = query.isEmpty ||
@@ -59,7 +62,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
         return RefreshIndicator(
           onRefresh: () async {
             setState(() {
-              future = widget.repository.loadProjects(cacheFirst: false);
+              future = _loadProjects(cacheFirst: false);
             });
             await future;
           },
@@ -127,6 +130,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       ),
                       itemBuilder: (context, index) => _ProjectTile(
                         project: filtered[index],
+                        payments: data.paymentsByProject[filtered[index].id] ??
+                            const [],
                         repository: widget.repository,
                         profile: widget.profile,
                         onChanged: _reload,
@@ -143,20 +148,49 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   void _reload() {
     setState(() {
-      future = widget.repository.loadProjects(cacheFirst: false);
+      future = _loadProjects(cacheFirst: false);
     });
+  }
+
+  Future<_ProjectsData> _loadProjects({bool cacheFirst = true}) async {
+    final canUseFinancial = widget.profile?.canUseFinancial == true;
+    final results = await Future.wait([
+      widget.repository.loadProjects(cacheFirst: cacheFirst),
+      if (canUseFinancial)
+        widget.repository.loadProjectPayments(cacheFirst: cacheFirst),
+    ]);
+    final projects = results[0] as List<Project>;
+    final payments = canUseFinancial
+        ? results[1] as List<ProjectPayment>
+        : const <ProjectPayment>[];
+    return _ProjectsData(
+      projects: projects,
+      paymentsByProject: _paymentsByProject(payments),
+    );
+  }
+
+  Map<int?, List<ProjectPayment>> _paymentsByProject(
+    List<ProjectPayment> payments,
+  ) {
+    final map = <int?, List<ProjectPayment>>{};
+    for (final payment in payments) {
+      map.putIfAbsent(payment.projectId, () => []).add(payment);
+    }
+    return map;
   }
 }
 
 class _ProjectTile extends StatefulWidget {
   const _ProjectTile({
     required this.project,
+    required this.payments,
     required this.repository,
     required this.profile,
     required this.onChanged,
   });
 
   final Project project;
+  final List<ProjectPayment> payments;
   final SolarProRepository repository;
   final AppProfile? profile;
   final VoidCallback onChanged;
@@ -213,8 +247,12 @@ class _ProjectTileState extends State<_ProjectTile> {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          ProjectDetailsPage(project: widget.project),
+                      builder: (_) => ProjectDetailsPage(
+                        project: widget.project,
+                        payments: widget.payments,
+                        canUseFinancial:
+                            widget.profile?.canUseFinancial == true,
+                      ),
                     ),
                   ),
                   borderRadius: BorderRadius.circular(12),
@@ -252,8 +290,13 @@ class _ProjectTileState extends State<_ProjectTile> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) =>
-                              ProjectDetailsPage(project: widget.project)),
+                        builder: (_) => ProjectDetailsPage(
+                          project: widget.project,
+                          payments: widget.payments,
+                          canUseFinancial:
+                              widget.profile?.canUseFinancial == true,
+                        ),
+                      ),
                     );
                   }
                   if (value == 'edit') {
@@ -278,6 +321,14 @@ class _ProjectTileState extends State<_ProjectTile> {
             ],
           ),
           const SizedBox(height: 14),
+          if (widget.profile?.canUseFinancial == true) ...[
+            PaymentStatusBadge(
+              project: widget.project,
+              payments: widget.payments,
+              compact: true,
+            ),
+            const SizedBox(height: 12),
+          ],
           Row(
             children: [
               Expanded(
@@ -447,6 +498,16 @@ class _ProjectTileState extends State<_ProjectTile> {
       }
     }
   }
+}
+
+class _ProjectsData {
+  const _ProjectsData({
+    this.projects = const [],
+    this.paymentsByProject = const {},
+  });
+
+  final List<Project> projects;
+  final Map<int?, List<ProjectPayment>> paymentsByProject;
 }
 
 class _ManualStatusCorrectionHint extends StatelessWidget {

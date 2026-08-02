@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../models/app_profile.dart';
 import '../models/client.dart';
 import '../models/project.dart';
+import '../models/project_payment.dart';
 import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/payment_status_badge.dart';
 import 'project_details_page.dart';
 
 class ClientDetailsPage extends StatefulWidget {
@@ -14,17 +17,19 @@ class ClientDetailsPage extends StatefulWidget {
     super.key,
     required this.client,
     required this.repository,
+    required this.profile,
   });
 
   final Client client;
   final SolarProRepository repository;
+  final AppProfile? profile;
 
   @override
   State<ClientDetailsPage> createState() => _ClientDetailsPageState();
 }
 
 class _ClientDetailsPageState extends State<ClientDetailsPage> {
-  late Future<List<Project>> projectsFuture;
+  late Future<_ClientProjectsData> projectsFuture;
   final money = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   @override
@@ -33,11 +38,34 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
     projectsFuture = _loadProjects();
   }
 
-  Future<List<Project>> _loadProjects() async {
-    final projects = await widget.repository.loadProjects(cacheFirst: false);
-    return projects
+  Future<_ClientProjectsData> _loadProjects() async {
+    final canUseFinancial = widget.profile?.canUseFinancial == true;
+    final results = await Future.wait([
+      widget.repository.loadProjects(cacheFirst: false),
+      if (canUseFinancial)
+        widget.repository.loadProjectPayments(cacheFirst: false),
+    ]);
+    final allProjects = results[0] as List<Project>;
+    final projects = allProjects
         .where((project) => project.clientId == widget.client.id)
         .toList();
+    final payments = canUseFinancial
+        ? results[1] as List<ProjectPayment>
+        : const <ProjectPayment>[];
+    return _ClientProjectsData(
+      projects: projects,
+      paymentsByProject: _paymentsByProject(payments),
+    );
+  }
+
+  Map<int?, List<ProjectPayment>> _paymentsByProject(
+    List<ProjectPayment> payments,
+  ) {
+    final map = <int?, List<ProjectPayment>>{};
+    for (final payment in payments) {
+      map.putIfAbsent(payment.projectId, () => []).add(payment);
+    }
+    return map;
   }
 
   @override
@@ -101,10 +129,11 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
               ),
             ),
             const SizedBox(height: 16),
-            FutureBuilder<List<Project>>(
+            FutureBuilder<_ClientProjectsData>(
               future: projectsFuture,
               builder: (context, snapshot) {
-                final projects = snapshot.data ?? [];
+                final data = snapshot.data ?? const _ClientProjectsData();
+                final projects = data.projects;
                 final revenue = projects.fold<double>(
                     0, (sum, item) => sum + item.projectValue);
                 final power = projects.fold<double>(
@@ -139,22 +168,48 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
                         (project) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: NeonCard(
-                            child: ListTile(
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        ProjectDetailsPage(project: project)),
-                              ),
-                              title: Text(
-                                '#${project.id ?? '-'} • ${ProjectStatus.labelFor(project.status)}',
-                              ),
-                              subtitle: Text(
-                                '${project.systemPower.toStringAsFixed(2)} kWp • ${project.moduleCount} módulos',
-                                style: const TextStyle(color: AppTheme.muted),
-                              ),
-                              trailing: const Icon(Icons.chevron_right_rounded),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ProjectDetailsPage(
+                                        project: project,
+                                        payments: data.paymentsByProject[
+                                                project.id] ??
+                                            const [],
+                                        canUseFinancial:
+                                            widget.profile?.canUseFinancial ==
+                                                true,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    '#${project.id ?? '-'} • ${ProjectStatus.labelFor(project.status)}',
+                                  ),
+                                  subtitle: Text(
+                                    '${project.systemPower.toStringAsFixed(2)} kWp • ${project.moduleCount} módulos',
+                                    style:
+                                        const TextStyle(color: AppTheme.muted),
+                                  ),
+                                  trailing:
+                                      const Icon(Icons.chevron_right_rounded),
+                                ),
+                                if (widget.profile?.canUseFinancial ==
+                                    true) ...[
+                                  const SizedBox(height: 8),
+                                  PaymentStatusBadge(
+                                    project: project,
+                                    payments:
+                                        data.paymentsByProject[project.id] ??
+                                            const [],
+                                    compact: true,
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
@@ -219,4 +274,14 @@ class _Metric extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ClientProjectsData {
+  const _ClientProjectsData({
+    this.projects = const [],
+    this.paymentsByProject = const {},
+  });
+
+  final List<Project> projects;
+  final Map<int?, List<ProjectPayment>> paymentsByProject;
 }

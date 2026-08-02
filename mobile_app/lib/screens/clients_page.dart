@@ -85,8 +85,9 @@ class _ClientsPageState extends State<ClientsPage> {
           ),
           body: RefreshIndicator(
             onRefresh: () async {
-              setState(() =>
-                  future = widget.repository.loadClients(cacheFirst: false));
+              setState(() {
+                future = widget.repository.loadClients(cacheFirst: false);
+              });
               await Future.wait([future, _loadProjectLinks(cacheFirst: false)]);
             },
             child: ListView(
@@ -186,6 +187,7 @@ class _ClientsPageState extends State<ClientsPage> {
                             builder: (_) => ClientDetailsPage(
                               client: client,
                               repository: widget.repository,
+                              profile: widget.profile,
                             ),
                           ),
                         ),
@@ -498,7 +500,9 @@ class _ClientsPageState extends State<ClientsPage> {
     );
 
     if (saved == true && mounted) {
-      setState(() => future = widget.repository.loadClients(cacheFirst: false));
+      setState(() {
+        future = widget.repository.loadClients(cacheFirst: false);
+      });
       ScaffoldMessenger.of(this.context).showSnackBar(
         SnackBar(
             content: Text(client == null
@@ -530,7 +534,9 @@ class _ClientsPageState extends State<ClientsPage> {
     try {
       await widget.repository.deleteClient(client.id!);
       if (!mounted) return;
-      setState(() => future = widget.repository.loadClients(cacheFirst: false));
+      setState(() {
+        future = widget.repository.loadClients(cacheFirst: false);
+      });
       ScaffoldMessenger.of(this.context).showSnackBar(
         const SnackBar(content: Text('Cliente excluído com sucesso.')),
       );

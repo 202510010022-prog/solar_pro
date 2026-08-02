@@ -11,6 +11,7 @@ import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/payment_status_badge.dart';
 
 const paymentTypes = [
   'Pix',
@@ -84,7 +85,9 @@ class _FinancialPageState extends State<FinancialPage> {
 
         return RefreshIndicator(
           onRefresh: () async {
-            setState(() => future = _load(cacheFirst: false));
+            setState(() {
+              future = _load(cacheFirst: false);
+            });
             await future;
           },
           child: ListView(
@@ -458,7 +461,9 @@ class _FinancialPageState extends State<FinancialPage> {
   }
 
   void _reload() {
-    setState(() => future = _load(cacheFirst: false));
+    setState(() {
+      future = _load(cacheFirst: false);
+    });
   }
 
   void _message(String text) {
@@ -600,18 +605,20 @@ class _ProjectFinancialCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final paid = payments
-        .where((payment) => payment.isPaid)
-        .fold<double>(0, (sum, payment) => sum + payment.amount);
-    final downPayment = project.downPayment;
-    final net = max(project.projectValue - project.discount, 0.0);
-    final totalPaid = downPayment + paid;
-    final remaining = max(net - totalPaid, 0.0);
-    final status = _status(remaining, totalPaid);
-    final statusColor = switch (status) {
-      'Pago' => AppTheme.green,
-      'Parcial' => AppTheme.primaryBlue,
-      'Atrasado' => AppTheme.orange,
+    final snapshot = ProjectPaymentSnapshot.fromProject(project, payments);
+    final net = snapshot.netValue;
+    final totalPaid = snapshot.totalPaid;
+    final remaining = snapshot.remaining;
+    final status = switch (snapshot.state) {
+      ProjectPaymentBadgeState.paid => 'Pago',
+      ProjectPaymentBadgeState.partial => 'Parcial',
+      ProjectPaymentBadgeState.overdue => 'Atrasado',
+      ProjectPaymentBadgeState.pending => 'Em aberto',
+    };
+    final statusColor = switch (snapshot.state) {
+      ProjectPaymentBadgeState.paid => AppTheme.green,
+      ProjectPaymentBadgeState.partial => AppTheme.primaryBlue,
+      ProjectPaymentBadgeState.overdue => AppTheme.orange,
       _ => AppTheme.muted,
     };
 
@@ -659,7 +666,8 @@ class _ProjectFinancialCard extends StatelessWidget {
           _line('Valor do projeto', money.format(project.projectValue)),
           if (project.discount > 0)
             _line('Desconto', '- ${money.format(project.discount)}'),
-          if (downPayment > 0) _line('Entrada', money.format(downPayment)),
+          if (project.downPayment > 0)
+            _line('Entrada', money.format(project.downPayment)),
           _line('Total pago', money.format(totalPaid)),
           _line('Faltando pagar', money.format(remaining), highlight: true),
           if (project.installmentsCount > 0 || project.installmentValue > 0)
@@ -722,17 +730,6 @@ class _ProjectFinancialCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _status(double remaining, double totalPaid) {
-    if (remaining <= 0 && project.projectValue > 0) return 'Pago';
-    if (project.firstDueDate != null &&
-        DateTime.now().isAfter(project.firstDueDate!) &&
-        remaining > 0) {
-      return 'Atrasado';
-    }
-    if (totalPaid > 0) return 'Parcial';
-    return 'Em aberto';
   }
 
   Widget _line(String label, String value, {bool highlight = false}) {

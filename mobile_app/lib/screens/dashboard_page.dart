@@ -11,6 +11,7 @@ import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/payment_status_badge.dart';
 import '../widgets/project_distribution_vertical_chart.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -139,20 +140,20 @@ class _DashboardPageState extends State<DashboardPage> {
                 payment.status == 'paid' && _sameMonth(payment.paidAt, today))
             .fold<double>(0, (sum, payment) => sum + payment.amount);
         final pendingAmount = projects.fold<double>(0, (sum, project) {
-          final remaining = _projectRemaining(
+          final remaining = ProjectPaymentSnapshot.fromProject(
             project,
             paymentsByProject[project.id] ?? const [],
-          );
+          ).remaining;
           final overdue = project.firstDueDate != null &&
               today.isAfter(project.firstDueDate!) &&
               remaining > 0;
           return overdue ? sum : sum + remaining;
         });
         final overdueAmount = projects.fold<double>(0, (sum, project) {
-          final remaining = _projectRemaining(
+          final remaining = ProjectPaymentSnapshot.fromProject(
             project,
             paymentsByProject[project.id] ?? const [],
-          );
+          ).remaining;
           final overdue = project.firstDueDate != null &&
               today.isAfter(project.firstDueDate!) &&
               remaining > 0;
@@ -407,15 +408,6 @@ class _DashboardPageState extends State<DashboardPage> {
       map.putIfAbsent(payment.projectId, () => []).add(payment);
     }
     return map;
-  }
-
-  double _projectRemaining(Project project, List<ProjectPayment> payments) {
-    final net = max(project.projectValue - project.discount, 0.0);
-    final paid = payments.where((payment) => payment.isPaid).fold<double>(
-          project.downPayment,
-          (sum, payment) => sum + payment.amount,
-        );
-    return max(net - paid, 0.0);
   }
 
   String _firstName(String? name) {

@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/project.dart';
+import '../models/project_payment.dart';
 import '../models/project_status.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/payment_status_badge.dart';
 
 class ProjectDetailsPage extends StatelessWidget {
-  const ProjectDetailsPage({super.key, required this.project});
+  const ProjectDetailsPage({
+    super.key,
+    required this.project,
+    this.payments = const [],
+    this.canUseFinancial = false,
+  });
 
   final Project project;
+  final List<ProjectPayment> payments;
+  final bool canUseFinancial;
 
   static const months = [
     'Jan',
@@ -45,6 +54,13 @@ class ProjectDetailsPage extends StatelessWidget {
             '${ProjectStatus.labelFor(project.status)} • ${project.projectDate}',
             style: const TextStyle(color: AppTheme.muted),
           ),
+          if (canUseFinancial) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: PaymentStatusBadge(project: project, payments: payments),
+            ),
+          ],
           if (ProjectStatus.rejected.matches(project.status) &&
               project.rejectionReason.trim().isNotEmpty) ...[
             const SizedBox(height: 12),
