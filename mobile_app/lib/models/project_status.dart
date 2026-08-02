@@ -4,10 +4,15 @@ enum ProjectStatus {
     label: 'Em negociação',
     dashboardLabel: 'Em negociação',
   ),
-  closed(
-    dbValue: 'Fechado',
-    label: 'Fechado',
+  approved(
+    dbValue: 'Aprovado',
+    label: 'Aprovado',
     dashboardLabel: 'Aprovados',
+  ),
+  installing(
+    dbValue: 'Em instalação',
+    label: 'Em instalação',
+    dashboardLabel: 'Instalação',
   ),
   completed(
     dbValue: 'Concluído',
@@ -30,9 +35,12 @@ enum ProjectStatus {
   final String label;
   final String dashboardLabel;
 
+  static const _legacyClosedDbValue = 'Fechado';
+
   static const ordered = [
     negotiating,
-    closed,
+    approved,
+    installing,
     completed,
     rejected,
   ];
@@ -41,8 +49,9 @@ enum ProjectStatus {
       ordered.map((status) => status.dbValue).toList(growable: false);
 
   static ProjectStatus? fromDbValue(String value) {
+    if (value.trim() == _legacyClosedDbValue) return approved;
     for (final status in ordered) {
-      if (status.dbValue == value) return status;
+      if (status.dbValue == value.trim()) return status;
     }
     return null;
   }
@@ -54,10 +63,12 @@ enum ProjectStatus {
 
   static String labelFor(String value) => fromDbValue(value)?.label ?? value;
 
-  bool matches(String value) => value == dbValue;
+  bool matches(String value) => fromDbValue(value) == this;
 
   static bool isConverted(String value) =>
-      closed.matches(value) || completed.matches(value);
+      approved.matches(value) ||
+      installing.matches(value) ||
+      completed.matches(value);
 
   static bool isPipeline(String value) => !rejected.matches(value);
 }

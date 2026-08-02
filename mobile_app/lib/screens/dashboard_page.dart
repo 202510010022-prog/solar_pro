@@ -85,8 +85,11 @@ class _DashboardPageState extends State<DashboardPage> {
         final negotiating = projects
             .where((item) => ProjectStatus.negotiating.matches(item.status))
             .length;
-        final closed = projects
-            .where((item) => ProjectStatus.closed.matches(item.status))
+        final approved = projects
+            .where((item) => ProjectStatus.approved.matches(item.status))
+            .length;
+        final installing = projects
+            .where((item) => ProjectStatus.installing.matches(item.status))
             .length;
         final completed = projects
             .where((item) => ProjectStatus.completed.matches(item.status))
@@ -95,8 +98,8 @@ class _DashboardPageState extends State<DashboardPage> {
             .where((item) => ProjectStatus.rejected.matches(item.status))
             .length;
         final canUseFinancial = widget.profile?.canUseFinancial == true;
-        final active = negotiating + closed;
-        final converted = closed + completed;
+        final active = negotiating + approved + installing;
+        final converted = approved + installing + completed;
         final today = DateTime.now();
         final todayProjects = projects
             .where((item) => _sameDay(_parseDate(item.projectDate), today))
@@ -256,7 +259,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       title: 'Receita fechada',
                       value: money.format(revenueClosed),
                       subtitle:
-                          '${ProjectStatus.closed.dashboardLabel} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
+                          '${ProjectStatus.approved.dashboardLabel} + ${ProjectStatus.installing.dashboardLabel.toLowerCase()} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
                       icon: Icons.savings_rounded,
                       color: AppTheme.primaryBlue,
                     ),
@@ -272,7 +275,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     title: 'Potência vendida',
                     value: '${soldPower.toStringAsFixed(2)} kWp',
                     subtitle:
-                        '${ProjectStatus.closed.dashboardLabel} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
+                        '${ProjectStatus.approved.dashboardLabel} + ${ProjectStatus.installing.dashboardLabel.toLowerCase()} + ${ProjectStatus.completed.dashboardLabel.toLowerCase()}',
                     icon: Icons.solar_power_rounded,
                     color: AppTheme.neonBlue,
                   ),
@@ -291,7 +294,8 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 14),
               _StatusDistribution(
                 negotiating: negotiating,
-                closed: closed,
+                approved: approved,
+                installing: installing,
                 completed: completed,
                 rejected: rejected,
               ),
@@ -1023,7 +1027,8 @@ class _RecentActivityCard extends StatelessWidget {
   }
 
   static Color _statusColor(String status) {
-    if (ProjectStatus.closed.matches(status)) return AppTheme.green;
+    if (ProjectStatus.approved.matches(status)) return AppTheme.green;
+    if (ProjectStatus.installing.matches(status)) return AppTheme.primaryBlue;
     if (ProjectStatus.completed.matches(status)) return AppTheme.neonBlue;
     if (ProjectStatus.rejected.matches(status)) return AppTheme.purple;
     return AppTheme.orange;
@@ -1154,13 +1159,15 @@ class _BillingAlertCard extends StatelessWidget {
 class _StatusDistribution extends StatelessWidget {
   const _StatusDistribution({
     required this.negotiating,
-    required this.closed,
+    required this.approved,
+    required this.installing,
     required this.completed,
     required this.rejected,
   });
 
   final int negotiating;
-  final int closed;
+  final int approved;
+  final int installing;
   final int completed;
   final int rejected;
 
@@ -1181,9 +1188,14 @@ class _StatusDistribution extends StatelessWidget {
                 color: AppTheme.orange,
               ),
               ProjectDistributionBarItem(
-                label: ProjectStatus.closed.dashboardLabel,
-                value: closed,
+                label: ProjectStatus.approved.dashboardLabel,
+                value: approved,
                 color: AppTheme.green,
+              ),
+              ProjectDistributionBarItem(
+                label: ProjectStatus.installing.dashboardLabel,
+                value: installing,
+                color: AppTheme.primaryBlue,
               ),
               ProjectDistributionBarItem(
                 label: ProjectStatus.completed.dashboardLabel,

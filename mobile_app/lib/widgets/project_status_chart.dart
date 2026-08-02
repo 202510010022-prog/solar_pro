@@ -17,26 +17,32 @@ class ProjectStatusChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       _ProjectStatusItem(
-        label: ProjectStatus.closed.dashboardLabel,
-        value: _count(ProjectStatus.closed.dbValue),
-        color: AppTheme.green,
-        icon: Icons.check_circle_rounded,
-      ),
-      _ProjectStatusItem(
-        label: ProjectStatus.completed.dashboardLabel,
-        value: _count(ProjectStatus.completed.dbValue),
-        color: AppTheme.neonBlue,
-        icon: Icons.verified_rounded,
-      ),
-      _ProjectStatusItem(
         label: ProjectStatus.negotiating.dashboardLabel,
-        value: _count(ProjectStatus.negotiating.dbValue),
+        value: _count(ProjectStatus.negotiating),
         color: AppTheme.orange,
         icon: Icons.forum_rounded,
       ),
       _ProjectStatusItem(
+        label: ProjectStatus.approved.dashboardLabel,
+        value: _count(ProjectStatus.approved),
+        color: AppTheme.green,
+        icon: Icons.check_circle_rounded,
+      ),
+      _ProjectStatusItem(
+        label: ProjectStatus.installing.dashboardLabel,
+        value: _count(ProjectStatus.installing),
+        color: AppTheme.primaryBlue,
+        icon: Icons.engineering_rounded,
+      ),
+      _ProjectStatusItem(
+        label: ProjectStatus.completed.dashboardLabel,
+        value: _count(ProjectStatus.completed),
+        color: AppTheme.neonBlue,
+        icon: Icons.verified_rounded,
+      ),
+      _ProjectStatusItem(
         label: ProjectStatus.rejected.dashboardLabel,
-        value: _count(ProjectStatus.rejected.dbValue),
+        value: _count(ProjectStatus.rejected),
         color: AppTheme.purple,
         icon: Icons.cancel_rounded,
       ),
@@ -117,8 +123,8 @@ class ProjectStatusChart extends StatelessWidget {
     );
   }
 
-  int _count(String status) {
-    return projects.where((project) => project.status == status).length;
+  int _count(ProjectStatus status) {
+    return projects.where((project) => status.matches(project.status)).length;
   }
 }
 
@@ -213,7 +219,7 @@ class _ProjectStatusChartPainter extends CustomPainter {
     }
 
     final slotWidth = chart.width / items.length;
-    final barWidth = math.min(46.0, slotWidth * 0.42);
+    final barWidth = math.min(42.0, math.max(14.0, slotWidth * 0.34));
 
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
@@ -245,27 +251,46 @@ class _ProjectStatusChartPainter extends CustomPainter {
         ).createShader(barRect.outerRect);
       canvas.drawRRect(barRect, fillPaint);
 
-      _drawText(
+      _drawCenteredText(
         canvas,
         '${item.value}',
-        Offset(centerX - 16, chart.bottom - barHeight - 24),
-        TextStyle(
+        centerX: centerX,
+        top: chart.bottom - barHeight - 24,
+        width: slotWidth,
+        style: TextStyle(
           color: item.color,
           fontSize: 18,
           fontWeight: FontWeight.w900,
         ),
-        maxWidth: 32,
-        align: TextAlign.center,
       );
-      _drawText(
+      _drawCenteredText(
         canvas,
         item.label,
-        Offset(centerX - slotWidth / 2 + 4, chart.bottom + 12),
-        labelStyle,
-        maxWidth: slotWidth - 8,
-        align: TextAlign.center,
+        centerX: centerX,
+        top: chart.bottom + 12,
+        width: slotWidth - 8,
+        style: labelStyle,
       );
     }
+  }
+
+  void _drawCenteredText(
+    Canvas canvas,
+    String text, {
+    required double centerX,
+    required double top,
+    required double width,
+    required TextStyle style,
+  }) {
+    final safeWidth = math.max(18.0, width);
+    _drawText(
+      canvas,
+      text,
+      Offset(centerX - safeWidth / 2, top),
+      style,
+      maxWidth: safeWidth,
+      align: TextAlign.center,
+    );
   }
 
   void _drawText(

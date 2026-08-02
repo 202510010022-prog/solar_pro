@@ -22,9 +22,7 @@ class ProjectEditPage extends StatefulWidget {
 }
 
 class _ProjectEditPageState extends State<ProjectEditPage> {
-  late String status = ProjectStatus.dbValues.contains(widget.project.status)
-      ? widget.project.status
-      : ProjectStatus.negotiating.dbValue;
+  late String status = ProjectStatus.fallbackDbValue(widget.project.status);
   late final laborCost =
       TextEditingController(text: widget.project.laborCost.toStringAsFixed(2));
   late final moduleUnitCost = TextEditingController(

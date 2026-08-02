@@ -54,7 +54,7 @@ class _ProjectDistributionPainter extends CustomPainter {
     if (items.isEmpty || size.width <= 0 || size.height <= 0) return;
 
     const left = 30.0;
-    const right = 4.0;
+    const right = 12.0;
     const top = 26.0;
     const bottom = 44.0;
     final chart = Rect.fromLTRB(
@@ -95,7 +95,7 @@ class _ProjectDistributionPainter extends CustomPainter {
     }
 
     final slotWidth = chart.width / items.length;
-    final barWidth = slotWidth.clamp(22.0, 28.0);
+    final barWidth = math.min(28.0, math.max(14.0, slotWidth * 0.34));
 
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
@@ -126,33 +126,52 @@ class _ProjectDistributionPainter extends CustomPainter {
       }
 
       final valueY = math.max(0.0, barTop - 22);
-      _drawText(
+      _drawCenteredText(
         canvas,
         '${item.value}',
-        Offset(centerX - slotWidth / 2, valueY),
-        TextStyle(
+        centerX: centerX,
+        top: valueY,
+        width: slotWidth,
+        style: TextStyle(
           color: item.color,
           fontSize: 14,
           fontWeight: FontWeight.w900,
         ),
-        maxWidth: slotWidth,
-        align: TextAlign.center,
       );
 
-      _drawText(
+      _drawCenteredText(
         canvas,
         item.label,
-        Offset(centerX - slotWidth / 2 + 2, chart.bottom + 10),
-        const TextStyle(
+        centerX: centerX,
+        top: chart.bottom + 10,
+        width: slotWidth - 4,
+        style: const TextStyle(
           color: AppTheme.muted,
           fontSize: 10.5,
           fontWeight: FontWeight.w700,
           height: 1.08,
         ),
-        maxWidth: slotWidth - 4,
-        align: TextAlign.center,
       );
     }
+  }
+
+  void _drawCenteredText(
+    Canvas canvas,
+    String text, {
+    required double centerX,
+    required double top,
+    required double width,
+    required TextStyle style,
+  }) {
+    final safeWidth = math.max(18.0, width);
+    _drawText(
+      canvas,
+      text,
+      Offset(centerX - safeWidth / 2, top),
+      style,
+      maxWidth: safeWidth,
+      align: TextAlign.center,
+    );
   }
 
   void _drawText(

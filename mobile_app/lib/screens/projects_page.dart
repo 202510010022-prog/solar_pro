@@ -50,8 +50,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
           final matchesSearch = query.isEmpty ||
               project.clientName.toLowerCase().contains(query) ||
               '${project.id}'.contains(query);
-          final matchesStatus =
-              statusFilter == 'Todos' || project.status == statusFilter;
+          final selectedStatus = ProjectStatus.fromDbValue(statusFilter);
+          final matchesStatus = statusFilter == 'Todos' ||
+              (selectedStatus?.matches(project.status) ?? false);
           return matchesSearch && matchesStatus;
         }).toList();
         return RefreshIndicator(
@@ -164,7 +165,7 @@ class _ProjectTile extends StatefulWidget {
 }
 
 class _ProjectTileState extends State<_ProjectTile> {
-  late String status = widget.project.status;
+  late String status = ProjectStatus.fallbackDbValue(widget.project.status);
 
   @override
   Widget build(BuildContext context) {
@@ -274,9 +275,7 @@ class _ProjectTileState extends State<_ProjectTile> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: ProjectStatus.dbValues.contains(status)
-                ? status
-                : ProjectStatus.negotiating.dbValue,
+            initialValue: ProjectStatus.fallbackDbValue(status),
             items: ProjectStatus.dbValues
                 .map(
                   (item) => DropdownMenuItem(
@@ -334,7 +333,8 @@ class _ProjectTileState extends State<_ProjectTile> {
 
   double _progressFor(String status) {
     if (ProjectStatus.completed.matches(status)) return 1.0;
-    if (ProjectStatus.closed.matches(status)) return 0.75;
+    if (ProjectStatus.installing.matches(status)) return 0.85;
+    if (ProjectStatus.approved.matches(status)) return 0.65;
     if (ProjectStatus.negotiating.matches(status)) return 0.45;
     if (ProjectStatus.rejected.matches(status)) return 0.08;
     return 0.25;
