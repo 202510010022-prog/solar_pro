@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/app_profile.dart';
 import '../models/project.dart';
 import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
@@ -12,10 +13,12 @@ class ProjectEditPage extends StatefulWidget {
     super.key,
     required this.project,
     required this.repository,
+    required this.profile,
   });
 
   final Project project;
   final SolarProRepository repository;
+  final AppProfile? profile;
 
   @override
   State<ProjectEditPage> createState() => _ProjectEditPageState();
@@ -97,6 +100,17 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
 
   @override
   Widget build(BuildContext context) {
+    final canManageAll = widget.profile?.canManageAll == true;
+    final statusOptions = ProjectStatus.selectableFor(
+      currentValue: widget.project.status,
+      canManageAll: canManageAll,
+    );
+    final isManualCorrection = canManageAll &&
+        ProjectStatus.isManualCorrection(
+          currentValue: widget.project.status,
+          targetValue: status,
+        );
+
     return Scaffold(
       appBar: AppBar(title: const Text('Editar projeto')),
       body: ListView(
@@ -119,11 +133,11 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: status,
-                  items: ProjectStatus.dbValues
+                  items: statusOptions
                       .map(
                         (item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(ProjectStatus.labelFor(item)),
+                          value: item.dbValue,
+                          child: Text(item.label),
                         ),
                       )
                       .toList(),
@@ -131,6 +145,10 @@ class _ProjectEditPageState extends State<ProjectEditPage> {
                       setState(() => status = value ?? status),
                   decoration: const InputDecoration(labelText: 'Status'),
                 ),
+                if (isManualCorrection) ...[
+                  const SizedBox(height: 8),
+                  const _ManualStatusCorrectionHint(),
+                ],
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -306,4 +324,37 @@ class _MaterialItem {
   final double value;
 
   Map<String, dynamic> toMap() => {'name': name, 'value': value};
+}
+
+class _ManualStatusCorrectionHint extends StatelessWidget {
+  const _ManualStatusCorrectionHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.orange.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppTheme.orange.withValues(alpha: 0.25)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: AppTheme.orange, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Alteração manual de status',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

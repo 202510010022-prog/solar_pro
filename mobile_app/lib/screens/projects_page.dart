@@ -122,7 +122,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         crossAxisSpacing: 12,
                         mainAxisSpacing: 12,
                         mainAxisExtent:
-                            widget.profile?.canManageAll == true ? 238 : 196,
+                            widget.profile?.canManageAll == true ? 276 : 196,
                       ),
                       itemBuilder: (context, index) => _ProjectTile(
                         project: filtered[index],
@@ -169,6 +169,17 @@ class _ProjectTileState extends State<_ProjectTile> {
 
   @override
   Widget build(BuildContext context) {
+    final canManageAll = widget.profile?.canManageAll == true;
+    final statusOptions = ProjectStatus.selectableFor(
+      currentValue: widget.project.status,
+      canManageAll: canManageAll,
+    );
+    final isManualCorrection = canManageAll &&
+        ProjectStatus.isManualCorrection(
+          currentValue: widget.project.status,
+          targetValue: status,
+        );
+
     return NeonCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -239,6 +250,7 @@ class _ProjectTileState extends State<_ProjectTile> {
                         builder: (_) => ProjectEditPage(
                           project: widget.project,
                           repository: widget.repository,
+                          profile: widget.profile,
                         ),
                       ),
                     );
@@ -276,11 +288,11 @@ class _ProjectTileState extends State<_ProjectTile> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: ProjectStatus.fallbackDbValue(status),
-            items: ProjectStatus.dbValues
+            items: statusOptions
                 .map(
                   (item) => DropdownMenuItem(
-                    value: item,
-                    child: Text(ProjectStatus.labelFor(item)),
+                    value: item.dbValue,
+                    child: Text(item.label),
                   ),
                 )
                 .toList(),
@@ -314,6 +326,10 @@ class _ProjectTileState extends State<_ProjectTile> {
             },
             decoration: const InputDecoration(labelText: 'Status'),
           ),
+          if (isManualCorrection) ...[
+            const SizedBox(height: 8),
+            const _ManualStatusCorrectionHint(),
+          ],
           if (widget.profile?.canManageAll == true) ...[
             const Spacer(),
             Align(
@@ -379,5 +395,38 @@ class _ProjectTileState extends State<_ProjectTile> {
         );
       }
     }
+  }
+}
+
+class _ManualStatusCorrectionHint extends StatelessWidget {
+  const _ManualStatusCorrectionHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.orange.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppTheme.orange.withValues(alpha: 0.25)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, color: AppTheme.orange, size: 18),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Alteração manual de status',
+              style: TextStyle(
+                color: AppTheme.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

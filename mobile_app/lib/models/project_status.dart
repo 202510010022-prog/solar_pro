@@ -65,6 +65,45 @@ enum ProjectStatus {
 
   bool matches(String value) => fromDbValue(value) == this;
 
+  static ProjectStatus? nextSequential(ProjectStatus status) {
+    return switch (status) {
+      negotiating => approved,
+      approved => installing,
+      installing => completed,
+      completed || rejected => null,
+    };
+  }
+
+  static List<ProjectStatus> selectableFor({
+    required String currentValue,
+    required bool canManageAll,
+  }) {
+    if (canManageAll) return ordered;
+
+    final current = fromDbValue(currentValue) ?? negotiating;
+    final options = <ProjectStatus>[current];
+    final next = nextSequential(current);
+    if (next != null) options.add(next);
+    if (current != rejected) options.add(rejected);
+    return options.toSet().toList(growable: false);
+  }
+
+  static bool isManualCorrection({
+    required String currentValue,
+    required String targetValue,
+  }) {
+    final current = fromDbValue(currentValue);
+    final target = fromDbValue(targetValue);
+    if (current == null || target == null || current == target) return false;
+
+    final normalTargets = <ProjectStatus>{
+      current,
+      if (nextSequential(current) != null) nextSequential(current)!,
+      if (current != rejected) rejected,
+    };
+    return !normalTargets.contains(target);
+  }
+
   static bool isConverted(String value) =>
       approved.matches(value) ||
       installing.matches(value) ||
