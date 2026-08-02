@@ -16,10 +16,19 @@ String friendlyNetworkError(
       .trim();
   final lower = text.toLowerCase();
 
+  if (lower.contains('transicao de status invalida') ||
+      lower.contains('transição de status inválida')) {
+    return 'Não é possível pular etapas do funil. Avance um status por vez.';
+  }
+
+  if (lower.contains('status de projeto invalido') ||
+      lower.contains('status de projeto inválido')) {
+    return 'Não foi possível alterar o status. Atualize a tela e tente novamente.';
+  }
+
   if (lower.contains('project_payments_idempotency_key_unique') ||
       lower.contains('manual_payments_idempotency_key_unique') ||
-      (lower.contains('duplicate key') &&
-          lower.contains('idempotency_key'))) {
+      (lower.contains('duplicate key') && lower.contains('idempotency_key'))) {
     return 'Este pagamento já foi registrado.';
   }
 
