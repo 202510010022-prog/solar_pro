@@ -4,10 +4,10 @@ class AppTheme {
   static const background = Color(0xFFF7FAF8);
   static const surface = Colors.white;
   static const border = Color(0xFFE7ECEA);
-  static const neonBlue = Color(0xFF0EA5A8);
-  static const primaryBlue = Color(0xFF12396A);
-  static const green = Color(0xFF38B86A);
-  static const orange = Color(0xFFFF9800);
+  static const neonBlue = Color(0xFF2300AE);
+  static const primaryBlue = Color(0xFF001F33);
+  static const green = Color(0xFF2300AE);
+  static const orange = Color(0xFFFDD22A);
   static const purple = Color(0xFF8B5CF6);
   static const text = Color(0xFF101828);
   static const muted = Color(0xFF667085);
