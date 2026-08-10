@@ -53,7 +53,6 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final compactNav = MediaQuery.sizeOf(context).width < 390;
     final pages = [
       DashboardPage(
         repository: widget.repository,
@@ -103,41 +102,38 @@ class _HomePageState extends State<HomePage> {
         },
       ),
       body: pages[index],
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _SlimBottomNav(
         selectedIndex: index,
-        onDestinationSelected: (value) => setState(() => index = value),
-        labelBehavior: compactNav
-            ? NavigationDestinationLabelBehavior.onlyShowSelected
-            : NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
+        onSelected: (value) => setState(() => index = value),
+        items: const [
+          _SlimNavItem(
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home_rounded,
             label: 'Início',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.people_alt_outlined),
-            selectedIcon: Icon(Icons.people_alt_rounded),
+          _SlimNavItem(
+            icon: Icons.people_alt_outlined,
+            selectedIcon: Icons.people_alt_rounded,
             label: 'CRM',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder_rounded),
+          _SlimNavItem(
+            icon: Icons.folder_outlined,
+            selectedIcon: Icons.folder_rounded,
             label: 'Projetos',
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.bolt_outlined),
-            selectedIcon: const Icon(Icons.bolt_rounded),
-            label: compactNav ? 'Dimens.' : 'Dimensionar',
+          _SlimNavItem(
+            icon: Icons.bolt_outlined,
+            selectedIcon: Icons.bolt_rounded,
+            label: 'Dimensionar',
           ),
-          NavigationDestination(
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
-            label: compactNav ? 'Financ.' : 'Financeiro',
+          _SlimNavItem(
+            icon: Icons.account_balance_wallet_outlined,
+            selectedIcon: Icons.account_balance_wallet_rounded,
+            label: 'Financeiro',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.more_horiz_rounded),
-            selectedIcon: Icon(Icons.more_horiz_rounded),
+          _SlimNavItem(
+            icon: Icons.more_horiz_rounded,
+            selectedIcon: Icons.more_horiz_rounded,
             label: 'Mais',
           ),
         ],
@@ -155,6 +151,132 @@ class _HomePageState extends State<HomePage> {
       _ => 'Mais',
     };
   }
+}
+
+class _SlimBottomNav extends StatelessWidget {
+  const _SlimBottomNav({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.items,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+  final List<_SlimNavItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppTheme.border.withValues(alpha: 0.92)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: List.generate(items.length, (itemIndex) {
+              final item = items[itemIndex];
+              return Expanded(
+                child: _SlimBottomNavButton(
+                  item: item,
+                  selected: selectedIndex == itemIndex,
+                  onTap: () => onSelected(itemIndex),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlimBottomNavButton extends StatelessWidget {
+  const _SlimBottomNavButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _SlimNavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppTheme.green : AppTheme.text;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: AppTheme.green.withValues(alpha: 0.08),
+        highlightColor: AppTheme.green.withValues(alpha: 0.05),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: selected ? 24 : 0,
+                height: 2.5,
+                margin: const EdgeInsets.only(bottom: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.green,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              Icon(
+                selected ? item.selectedIcon : item.icon,
+                color: color,
+                size: selected ? 24 : 23,
+              ),
+              const SizedBox(height: 3),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 10.6,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlimNavItem {
+  const _SlimNavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
 }
 
 class _SolarProDrawer extends StatelessWidget {
