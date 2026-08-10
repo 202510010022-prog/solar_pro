@@ -5,6 +5,7 @@ import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../models/project_status.dart';
 import '../theme/app_theme.dart';
+import '../widgets/monthly_energy_bars.dart';
 import '../widgets/neon_card.dart';
 import '../widgets/payment_status_badge.dart';
 
@@ -134,17 +135,32 @@ class ProjectDetailsPage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                ...List.generate(12, (index) {
-                  final consumption = _at(project.monthlyConsumptions, index);
-                  final generation = _at(project.monthlyGenerations, index);
-                  final balance = _at(project.monthlyBalances, index);
-                  return _MonthComparison(
-                    month: months[index],
-                    consumption: consumption,
-                    generation: generation,
-                    balance: balance,
-                  );
-                }),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const spacing = 10.0;
+                    final itemWidth = (constraints.maxWidth - spacing) / 2;
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: List.generate(12, (index) {
+                        final consumption =
+                            _at(project.monthlyConsumptions, index);
+                        final generation =
+                            _at(project.monthlyGenerations, index);
+                        final balance = _at(project.monthlyBalances, index);
+                        return SizedBox(
+                          width: itemWidth,
+                          child: _MonthComparison(
+                            month: months[index],
+                            consumption: consumption,
+                            generation: generation,
+                            balance: balance,
+                          ),
+                        );
+                      }),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -365,43 +381,11 @@ class _MonthComparison extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxMain =
-        [consumption, generation, 1.0].reduce((a, b) => a > b ? a : b);
-    final maxBalance =
-        [balance.abs(), maxMain * 0.25, 1.0].reduce((a, b) => a > b ? a : b);
-    final balanceColor = balance >= 0 ? AppTheme.green : Colors.redAccent;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(month, style: const TextStyle(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 8),
-          _BarRow(
-            label: 'Consumo',
-            valueLabel: '${consumption.toStringAsFixed(0)} kWh',
-            value: consumption,
-            maxValue: maxMain,
-            color: AppTheme.orange,
-          ),
-          const SizedBox(height: 6),
-          _BarRow(
-            label: 'Geração',
-            valueLabel: '${generation.toStringAsFixed(0)} kWh',
-            value: generation,
-            maxValue: maxMain,
-            color: AppTheme.primaryBlue,
-          ),
-          const SizedBox(height: 6),
-          _BarRow(
-            label: 'Saldo',
-            valueLabel: '${balance.toStringAsFixed(0)} kWh',
-            value: balance.abs(),
-            maxValue: maxBalance,
-            color: balanceColor,
-          ),
-        ],
-      ),
+    return MonthlyEnergyBars(
+      month: month,
+      consumption: consumption,
+      generation: generation,
+      balance: balance,
     );
   }
 }
@@ -429,77 +413,6 @@ class _Metric extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _BarRow extends StatelessWidget {
-  const _BarRow({
-    required this.label,
-    required this.valueLabel,
-    required this.value,
-    required this.maxValue,
-    required this.color,
-  });
-
-  final String label;
-  final String valueLabel;
-  final double value;
-  final double maxValue;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = maxValue <= 0 ? 0.0 : (value / maxValue).clamp(0.0, 1.0);
-    return Row(
-      children: [
-        SizedBox(
-          width: 76,
-          child: Text(label,
-              style: const TextStyle(color: AppTheme.muted, fontSize: 12)),
-        ),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final width = value <= 0
-                  ? 0.0
-                  : (constraints.maxWidth * ratio)
-                      .clamp(4.0, constraints.maxWidth);
-              return Container(
-                height: 9,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                alignment: Alignment.centerLeft,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  width: width,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 76,
-          child: Text(
-            valueLabel,
-            textAlign: TextAlign.end,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
     );
   }
 }

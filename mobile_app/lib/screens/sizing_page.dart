@@ -9,6 +9,7 @@ import '../services/sizing_service.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
 import '../utils/friendly_error.dart';
+import '../widgets/monthly_energy_bars.dart';
 import '../widgets/neon_card.dart';
 
 class SizingPage extends StatefulWidget {
@@ -555,14 +556,27 @@ class _SizingPageState extends State<SizingPage> {
                 const Text('Geração x consumo mensal',
                     style: TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 12),
-                ...List.generate(12, (index) {
-                  return _MonthlyBalanceBar(
-                    month: months[index],
-                    consumption: consumption[index].text,
-                    generation: data.monthlyGenerations[index],
-                    balance: data.monthlyBalances[index],
-                  );
-                }),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const spacing = 10.0;
+                    final itemWidth = (constraints.maxWidth - spacing) / 2;
+                    return Wrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: List.generate(12, (index) {
+                        return SizedBox(
+                          width: itemWidth,
+                          child: _MonthlyBalanceBar(
+                            month: months[index],
+                            consumption: consumption[index].text,
+                            generation: data.monthlyGenerations[index],
+                            balance: data.monthlyBalances[index],
+                          ),
+                        );
+                      }),
+                    );
+                  },
+                ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: saving ? null : saveProject,
@@ -1219,56 +1233,11 @@ class _MonthlyBalanceBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final consumed = _number(consumption);
-    final maxValue =
-        [consumed, generation, 1.0].reduce((a, b) => a > b ? a : b);
-    final positive = balance >= 0;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(width: 38, child: Text(month)),
-              Expanded(
-                child: Column(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: consumed / maxValue,
-                        minHeight: 7,
-                        backgroundColor: Colors.white.withValues(alpha: 0.06),
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppTheme.orange),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: generation / maxValue,
-                        minHeight: 7,
-                        backgroundColor: Colors.white.withValues(alpha: 0.06),
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppTheme.primaryBlue),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Consumo ${consumed.toStringAsFixed(0)} kWh • Geração ${generation.toStringAsFixed(0)} kWh • Saldo ${balance.toStringAsFixed(0)} kWh',
-            style: TextStyle(
-              color: positive ? AppTheme.green : Colors.redAccent,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+    return MonthlyEnergyBars(
+      month: month,
+      consumption: consumed,
+      generation: generation,
+      balance: balance,
     );
   }
 
