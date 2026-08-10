@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,7 @@ import 'config/supabase_config.dart';
 import 'screens/home_page.dart';
 import 'screens/login_page.dart';
 import 'services/cache_service.dart';
+import 'services/secure_supabase_local_storage.dart';
 import 'services/solarpro_repository.dart';
 import 'theme/app_theme.dart';
 
@@ -17,11 +19,22 @@ Future<void> main() async {
     await Supabase.initialize(
       url: SupabaseConfig.url,
       publishableKey: SupabaseConfig.publishableKey,
+      authOptions: _authOptionsForPlatform(SupabaseConfig.url),
     );
     runApp(const SolarProMobileApp());
   } catch (error) {
     runApp(SolarProStartupErrorApp(error: error));
   }
+}
+
+FlutterAuthClientOptions _authOptionsForPlatform(String url) {
+  if (kIsWeb) return const FlutterAuthClientOptions();
+  final projectRef = Uri.parse(url).host.split('.').first;
+  return FlutterAuthClientOptions(
+    localStorage: SecureSupabaseLocalStorage(
+      persistSessionKey: 'sb-$projectRef-auth-token',
+    ),
+  );
 }
 
 class SolarProMobileApp extends StatefulWidget {
