@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../models/app_profile.dart';
 import '../models/client.dart';
 import '../models/project.dart';
 import '../models/project_status.dart';
@@ -50,14 +51,17 @@ class ReportService {
 
   final SolarProRepository repository;
 
-  static const _headers = [
+  static const _baseHeaders = [
     'Projeto',
     'Cliente',
     'Status',
-    'Valor do projeto',
     'Data de criação',
     'Potência instalada',
     'Geração anual estimada',
+  ];
+
+  static const _financialHeaders = [
+    'Valor do projeto',
     'Payback',
     'Economia mensal estimada',
   ];
@@ -65,19 +69,37 @@ class ReportService {
   final _money = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
   final _number = NumberFormat.decimalPattern('pt_BR');
   final _date = DateFormat('dd/MM/yyyy');
-  final _stamp = DateFormat('yyyyMMdd_HHmm');
+  final _stamp = DateFormat('yyyyMMdd_HHmmss');
 
   Future<ReportFile> generateProjectsReport({
     required ReportType type,
     required ReportFormat format,
+    required AppProfile? profile,
   }) async {
     final projects = await repository.loadProjects(cacheFirst: true);
     final clients = await repository.loadClients(cacheFirst: true);
-    final rows = _projectRows(_filterProjects(projects, type), clients);
+    final canUseFinancial = profile?.canUseFinancial == true;
+    final rows = _projectRows(
+      _filterProjects(
+        projects,
+        type,
+        profile: profile,
+      ),
+      clients,
+      canUseFinancial: canUseFinancial,
+    );
 
     return switch (format) {
-      ReportFormat.csv => _generateCsv(type: type, rows: rows),
-      ReportFormat.pdf => _generatePdf(type: type, rows: rows),
+      ReportFormat.csv => _generateCsv(
+          type: type,
+          rows: rows,
+          canUseFinancial: canUseFinancial,
+        ),
+      ReportFormat.pdf => _generatePdf(
+          type: type,
+          rows: rows,
+          canUseFinancial: canUseFinancial,
+        ),
     };
   }
 
@@ -105,25 +127,31 @@ class ReportService {
   Future<ReportFile> _generateCsv({
     required ReportType type,
     required List<_ProjectReportRow> rows,
+    required bool canUseFinancial,
   }) async {
+    final headers = _headers(canUseFinancial: canUseFinancial);
+    final totals = <List<Object>>[
+      [],
+      ['Totais'],
+      ['Quantidade de projetos', rows.length],
+      if (canUseFinancial)
+        [
+          'Soma de valores',
+          rows.fold<double>(0, (sum, row) => sum + row.project.projectValue),
+        ],
+      [
+        'Soma de geração',
+        rows.fold<double>(0, (sum, row) => sum + row.project.annualGeneration),
+      ],
+    ];
     final content = const CsvEncoder(
       fieldDelimiter: ';',
       quoteCharacter: '"',
       lineDelimiter: '\n',
     ).convert([
-      _headers,
+      headers,
       ...rows.map((row) => row.csvValues),
-      [],
-      ['Totais'],
-      ['Quantidade de projetos', rows.length],
-      [
-        'Soma de valores',
-        rows.fold<double>(0, (sum, row) => sum + row.project.projectValue),
-      ],
-      [
-        'Soma de geração',
-        rows.fold<double>(0, (sum, row) => sum + row.project.annualGeneration),
-      ],
+      ...totals,
     ]);
 
     final saved = await saveReportBytes(
@@ -141,12 +169,14 @@ class ReportService {
   Future<ReportFile> _generatePdf({
     required ReportType type,
     required List<_ProjectReportRow> rows,
+    required bool canUseFinancial,
   }) async {
     final document = pw.Document();
     final totalValue =
         rows.fold<double>(0, (sum, row) => sum + row.project.projectValue);
     final totalGeneration =
         rows.fold<double>(0, (sum, row) => sum + row.project.annualGeneration);
+    final headers = _headers(canUseFinancial: canUseFinancial);
 
     document.addPage(
       pw.MultiPage(
@@ -176,7 +206,7 @@ class ReportService {
         ),
         build: (_) => [
           pw.TableHelper.fromTextArray(
-            headers: _headers,
+            headers: headers,
             data: rows.map((row) => row.pdfValues).toList(),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.green600),
             headerStyle: pw.TextStyle(
@@ -203,7 +233,8 @@ class ReportService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 _totalBox('Projetos', '${rows.length}'),
-                _totalBox('Soma de valores', _money.format(totalValue)),
+                if (canUseFinancial)
+                  _totalBox('Soma de valores', _money.format(totalValue)),
                 _totalBox(
                   'Soma de geração',
                   '${_number.format(totalGeneration)} kWh',
@@ -244,10 +275,29 @@ class ReportService {
     );
   }
 
-  List<Project> _filterProjects(List<Project> projects, ReportType type) {
-    if (type == ReportType.projects) return projects;
+  List<String> _headers({required bool canUseFinancial}) {
+    return [
+      ..._baseHeaders,
+      if (canUseFinancial) ..._financialHeaders,
+    ];
+  }
+
+  List<Project> _filterProjects(
+    List<Project> projects,
+    ReportType type, {
+    required AppProfile? profile,
+  }) {
+    final sellerId = profile?.id;
+    final scopedProjects = profile?.canManageAll == true
+        ? projects
+        : sellerId == null
+            ? <Project>[]
+            : projects
+                .where((project) => project.sellerId == sellerId)
+                .toList();
+    if (type == ReportType.projects) return scopedProjects;
     final now = DateTime.now();
-    return projects.where((project) {
+    return scopedProjects.where((project) {
       final date = DateTime.tryParse(project.projectDate);
       return date != null && date.year == now.year && date.month == now.month;
     }).toList();
@@ -255,8 +305,9 @@ class ReportService {
 
   List<_ProjectReportRow> _projectRows(
     List<Project> projects,
-    List<Client> clients,
-  ) {
+    List<Client> clients, {
+    required bool canUseFinancial,
+  }) {
     final clientsById = {for (final client in clients) client.id: client};
     return projects.map((project) {
       return _ProjectReportRow(
@@ -265,6 +316,7 @@ class ReportService {
         money: _money,
         number: _number,
         date: _date,
+        canUseFinancial: canUseFinancial,
       );
     }).toList();
   }
@@ -283,6 +335,7 @@ class _ProjectReportRow {
     required this.money,
     required this.number,
     required this.date,
+    required this.canUseFinancial,
   });
 
   final Project project;
@@ -290,6 +343,7 @@ class _ProjectReportRow {
   final NumberFormat money;
   final NumberFormat number;
   final DateFormat date;
+  final bool canUseFinancial;
 
   String get projectLabel => project.id == null ? '-' : '#${project.id}';
 
@@ -309,23 +363,27 @@ class _ProjectReportRow {
         projectLabel,
         clientLabel,
         ProjectStatus.labelFor(project.status),
-        project.projectValue,
         createdAt,
         project.systemPower,
         project.annualGeneration,
-        project.paybackYears,
-        project.monthlySavings,
+        if (canUseFinancial) ...[
+          project.projectValue,
+          project.paybackYears,
+          project.monthlySavings,
+        ],
       ];
 
   List<String> get pdfValues => [
         projectLabel,
         clientLabel,
         ProjectStatus.labelFor(project.status),
-        money.format(project.projectValue),
         createdAt,
         '${number.format(project.systemPower)} kWp',
         '${number.format(project.annualGeneration)} kWh',
-        '${number.format(project.paybackYears)} anos',
-        money.format(project.monthlySavings),
+        if (canUseFinancial) ...[
+          money.format(project.projectValue),
+          '${number.format(project.paybackYears)} anos',
+          money.format(project.monthlySavings),
+        ],
       ];
 }

@@ -120,7 +120,9 @@ class MorePage extends StatelessWidget {
               _ActionTile(
                 icon: Icons.file_download_outlined,
                 title: 'Exportar relatório',
-                subtitle: 'Gere CSV ou PDF com os projetos da empresa',
+                subtitle: currentProfile?.canManageAll == true
+                    ? 'Gere CSV ou PDF com os projetos da empresa'
+                    : 'Gere CSV ou PDF apenas com seus projetos',
                 onTap: () => _openReportDialog(context),
               ),
             ],
@@ -364,6 +366,7 @@ class MorePage extends StatelessWidget {
                 final report = await service.generateProjectsReport(
                   type: type,
                   format: format,
+                  profile: profile,
                 );
                 if (!context.mounted) return;
                 Navigator.pop(dialogContext);
