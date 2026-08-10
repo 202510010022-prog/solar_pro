@@ -7,12 +7,18 @@ const allowedOrigins = [
 ];
 
 function getCorsHeaders(origin?: string): Record<string, string> {
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : "null";
+  const corsOrigin = origin && isAllowedOrigin(origin) ? origin : "null";
   return {
     "Access-Control-Allow-Origin": corsOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
+}
+
+function isAllowedOrigin(origin: string) {
+  if (allowedOrigins.includes(origin)) return true;
+  return /^http:\/\/(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/
+    .test(origin);
 }
 
 let corsHeaders = getCorsHeaders();
