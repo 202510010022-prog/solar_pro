@@ -5,6 +5,7 @@ import '../models/app_profile.dart';
 import '../models/team_invite_result.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/neon_card.dart';
 
 class TeamUsersPage extends StatefulWidget {
@@ -171,7 +172,12 @@ class _TeamUsersPageState extends State<TeamUsersPage> {
       _message('Usuário excluído.');
     } catch (error) {
       if (!mounted) return;
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível excluir o usuário.',
+        ),
+      );
     }
   }
 
@@ -458,7 +464,12 @@ class _EditTeamUserDialogState extends State<_EditTeamUserDialog> {
     } catch (error) {
       if (!mounted) return;
       setState(() => sending = false);
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível atualizar o usuário.',
+        ),
+      );
     }
   }
 
@@ -598,7 +609,12 @@ class _InviteUserDialogState extends State<_InviteUserDialog> {
     } catch (error) {
       if (!mounted) return;
       setState(() => sending = false);
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível convidar o usuário.',
+        ),
+      );
     }
   }
 

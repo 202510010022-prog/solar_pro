@@ -152,7 +152,12 @@ class _BetaAdminPageState extends State<BetaAdminPage> {
       _message('Pagamento marcado como pago e assinatura atualizada.');
     } catch (error) {
       if (!mounted) return;
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível marcar o pagamento como pago.',
+        ),
+      );
     }
   }
 
@@ -164,7 +169,12 @@ class _BetaAdminPageState extends State<BetaAdminPage> {
       _message('Cobrança cancelada.');
     } catch (error) {
       if (!mounted) return;
-      _message(error.toString().replaceFirst('Bad state: ', ''));
+      _message(
+        friendlyNetworkError(
+          error,
+          fallback: 'Não foi possível cancelar a cobrança.',
+        ),
+      );
     }
   }
 

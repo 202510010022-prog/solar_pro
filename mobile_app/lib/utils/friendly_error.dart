@@ -5,10 +5,12 @@ const _networkMessage =
 
 String friendlyNetworkError(
   Object error, {
-  String fallback = 'Não foi possível concluir a ação agora.',
+  String fallback = 'Não foi possível completar a ação. Tente novamente.',
 }) {
   if (error is TimeoutException) return _networkMessage;
 
+  // Keep complete technical details in debugPrint/logs during development.
+  // They must never be forwarded raw to the production UI.
   final text = error
       .toString()
       .replaceFirst('Bad state: ', '')
@@ -47,5 +49,5 @@ String friendlyNetworkError(
   }
 
   if (text.isEmpty) return fallback;
-  return text;
+  return fallback;
 }
