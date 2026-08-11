@@ -1166,6 +1166,17 @@ class _PvgisValidationCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (data?.geocodingProvider == 'nominatim') ...[
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Localização: Nominatim - © OpenStreetMap contributors - openstreetmap.org/copyright',
+                        style: TextStyle(
+                          color: AppTheme.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

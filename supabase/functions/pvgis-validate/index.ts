@@ -61,8 +61,8 @@ type GeocodingAttempt = {
   };
 };
 
-const nominatimDelayMs = 1100;
 const nominatimTimeoutMs = 12000;
+const defaultNominatimBaseUrl = "https://nominatim.openstreetmap.org";
 const nominatimHeaders = {
   "Accept": "application/json",
   "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6",
@@ -327,11 +327,8 @@ async function resolveLocation(payload: PvgisPayload) {
   }
 
   let lastError = "";
-  let calledNominatim = false;
   for (const attempt of attempts) {
-    if (calledNominatim) await delay(nominatimDelayMs);
     const result = await geocodeAttempt(attempt);
-    calledNominatim = true;
     if ("error" in result) {
       lastError = result.error;
       continue;
@@ -347,6 +344,9 @@ async function resolveLocation(payload: PvgisPayload) {
 }
 
 async function geocodeAttempt(attempt: GeocodingAttempt) {
+  const slot = await reserveNominatimRequestSlot();
+  if ("error" in slot) return slot;
+
   const params = new URLSearchParams({
     format: "jsonv2",
     limit: "3",
@@ -365,7 +365,7 @@ async function geocodeAttempt(attempt: GeocodingAttempt) {
   const timeout = setTimeout(() => controller.abort(), nominatimTimeoutMs);
   try {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?${params.toString()}`,
+      `${nominatimBaseUrl()}/search?${params.toString()}`,
       {
         headers: nominatimHeaders,
         signal: controller.signal,
@@ -397,6 +397,68 @@ async function geocodeAttempt(attempt: GeocodingAttempt) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function reserveNominatimRequestSlot() {
+  const supabaseUrl = clean(Deno.env.get("SUPABASE_URL"));
+  const adminKey = supabaseAdminApiKey();
+  if (!supabaseUrl || !adminKey) {
+    return { error: "Geocodificação temporariamente indisponível." };
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "apikey": adminKey,
+    };
+    if (!isSupabaseSecretKey(adminKey)) {
+      headers["Authorization"] = `Bearer ${adminKey}`;
+    }
+
+    const response = await fetch(
+      `${supabaseUrl.replace(/\/+$/, "")}/rest/v1/rpc/reserve_nominatim_request_slot`,
+      {
+        method: "POST",
+        headers,
+        body: "{}",
+      },
+    );
+    if (!response.ok) {
+      return { error: "Geocodificação temporariamente indisponível." };
+    }
+    return { ok: true };
+  } catch (_) {
+    return { error: "Geocodificação temporariamente indisponível." };
+  }
+}
+
+function supabaseAdminApiKey() {
+  const secretKeys = clean(Deno.env.get("SUPABASE_SECRET_KEYS"));
+  if (secretKeys) {
+    try {
+      const parsed = JSON.parse(secretKeys);
+      if (typeof parsed?.default === "string") return parsed.default;
+      if (parsed && typeof parsed === "object") {
+        const first = Object.values(parsed).find((value) =>
+          typeof value === "string" && value.trim()
+        );
+        if (typeof first === "string") return first;
+      }
+    } catch (_) {
+      if (secretKeys.startsWith("sb_secret_")) return secretKeys;
+    }
+  }
+
+  return clean(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+}
+
+function isSupabaseSecretKey(value: string) {
+  return value.startsWith("sb_secret_");
+}
+
+function nominatimBaseUrl() {
+  const configured = clean(Deno.env.get("NOMINATIM_BASE_URL"));
+  return (configured || defaultNominatimBaseUrl).replace(/\/+$/, "");
 }
 
 function selectGeocodingCandidate(attempt: GeocodingAttempt, candidate: any) {
@@ -570,10 +632,6 @@ function normalizeText(value: unknown) {
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function onlyDigits(value: unknown) {
