@@ -25,6 +25,7 @@ let corsHeaders = getCorsHeaders();
 
 type PvgisPayload = {
   mode?: string;
+  orientation_mode?: "automatic" | "manual";
   latitude?: number | string;
   longitude?: number | string;
   address?: {
@@ -100,10 +101,15 @@ Deno.serve(async (request) => {
     const pvgisAnnual = monthlyGenerations.reduce((sum, value) => sum + value, 0);
     const base = Math.max(estimatedAnnual, 1);
     const differencePercent = ((pvgisAnnual - estimatedAnnual) / base) * 100;
+    const pvOrientation = extractPvOrientation(data);
 
     return jsonResponse({
       ok: true,
       mode,
+      orientation_mode: pvOrientation.mode,
+      pv_slope: pvOrientation.slope,
+      pv_azimuth: pvOrientation.azimuth,
+      pvgis_aspect: pvOrientation.pvgisAspect,
       estimated_annual_generation: estimatedAnnual,
       pvgis_annual_generation: pvgisAnnual,
       monthly_generations: monthlyGenerations,
@@ -135,8 +141,7 @@ async function fetchPvgis(options: {
     loss: options.loss.toFixed(2),
     pvtechchoice: "crystSi",
     mountingplace: "free",
-    angle: "10",
-    aspect: "0",
+    optimalangles: "1",
     outputformat: "json",
   };
   const databases = ["", "PVGIS-SARAH3", "PVGIS-NSRDB", "PVGIS-ERA5"];
@@ -180,6 +185,36 @@ async function fetchPvgis(options: {
       `PVGIS recusou a consulta para as coordenadas ${options.latitude.toFixed(5)}, ${options.longitude.toFixed(5)}. ` +
       errors.filter(Boolean).join(" | "),
   };
+}
+
+function extractPvOrientation(data: any) {
+  const fixed = data?.inputs?.mounting_system?.fixed;
+  const slope = finiteOrNull(toNumber(fixed?.slope?.value));
+  const pvgisAspect = finiteOrNull(toNumber(fixed?.azimuth?.value));
+
+  return {
+    mode: "automatic",
+    slope,
+    pvgisAspect,
+    azimuth: pvgisAspect === null
+      ? null
+      : pvgisAspectToGeographicAzimuth(pvgisAspect),
+  };
+}
+
+// PVGIS uses aspect/azimuth with 0=south, 90=west, -90=east.
+// Solar Pro exposes pv_azimuth as conventional geographic azimuth:
+// 0/360=north, 90=east, 180=south, 270=west.
+function pvgisAspectToGeographicAzimuth(pvgisAspect: number) {
+  return normalizeDegrees(180 + pvgisAspect);
+}
+
+function normalizeDegrees(value: number) {
+  return ((value % 360) + 360) % 360;
+}
+
+function finiteOrNull(value: number) {
+  return Number.isFinite(value) ? value : null;
 }
 
 async function resolveLocation(payload: PvgisPayload) {

@@ -9,6 +9,10 @@ class PvgisValidationResult {
     required this.longitude,
     required this.locationSource,
     required this.locationLabel,
+    required this.orientationMode,
+    this.pvSlope,
+    this.pvAzimuth,
+    this.pvgisAspect,
   });
 
   final double estimatedAnnualGeneration;
@@ -20,6 +24,10 @@ class PvgisValidationResult {
   final double longitude;
   final String locationSource;
   final String locationLabel;
+  final String orientationMode;
+  final double? pvSlope;
+  final double? pvAzimuth;
+  final double? pvgisAspect;
 
   bool get needsReview => differencePercent.abs() > 15;
   String get badgeLabel => needsReview ? 'Revisar' : 'OK';
@@ -40,7 +48,19 @@ class PvgisValidationResult {
       longitude: _double(map['longitude']),
       locationSource: '${map['location_source'] ?? ''}',
       locationLabel: '${map['location_label'] ?? ''}',
+      orientationMode: '${map['orientation_mode'] ?? 'automatic'}',
+      pvSlope: _nullableDouble(map['pv_slope']),
+      pvAzimuth: _nullableDouble(map['pv_azimuth']),
+      pvgisAspect: _nullableDouble(map['pvgis_aspect']),
     );
+  }
+
+  static double? _nullableDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    final raw = '$value'.trim();
+    if (raw.isEmpty || raw == 'null') return null;
+    return double.tryParse(raw);
   }
 
   static double _double(dynamic value) {
