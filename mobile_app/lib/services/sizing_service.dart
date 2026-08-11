@@ -63,6 +63,21 @@ class SizingResult {
 }
 
 class SizingService {
+  static const daysInMonth = <int>[
+    31,
+    28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+
   SizingResult calculate({
     required List<double> monthlyConsumption,
     required List<double> monthlyHsp,
@@ -80,16 +95,21 @@ class SizingService {
     final averageHsp = hsp.fold<double>(0, (sum, item) => sum + item) / 12;
     final targetAnnualGeneration =
         annualConsumption * (1 + generationExtraPercent / 100);
-    final safeHsp = averageHsp <= 0 ? 1 : averageHsp;
+    final safeHsp = averageHsp <= 0 ? 1.0 : averageHsp;
     final safePr = performanceRatio <= 0 ? 0.8 : performanceRatio;
-    final systemPower = targetAnnualGeneration / (safeHsp * 30 * 12 * safePr);
+    final annualEquivalentSolarHours = _annualEquivalentSolarHours(
+      hsp: hsp,
+      fallbackHsp: safeHsp,
+    );
+    final systemPower =
+        targetAnnualGeneration / (annualEquivalentSolarHours * safePr);
     final moduleCount =
         modulePower <= 0 ? 0 : (systemPower * 1000 / modulePower).ceil();
     final installedPower = moduleCount * modulePower / 1000;
-    final monthlyGenerations = hsp
-        .map((monthHsp) =>
-            installedPower * (monthHsp <= 0 ? safeHsp : monthHsp) * 30 * safePr)
-        .toList();
+    final monthlyGenerations = List<double>.generate(12, (index) {
+      final monthHsp = hsp[index] <= 0 ? safeHsp : hsp[index];
+      return installedPower * monthHsp * daysInMonth[index] * safePr;
+    });
     final monthlyBalances = List<double>.generate(
       12,
       (index) => monthlyGenerations[index] - consumption[index],
@@ -121,6 +141,16 @@ class SizingService {
 
   List<double> _normalize(List<double> values, int size) {
     return _normalizeList(values, size);
+  }
+
+  double _annualEquivalentSolarHours({
+    required List<double> hsp,
+    required double fallbackHsp,
+  }) {
+    return List<double>.generate(12, (index) {
+      final monthHsp = hsp[index] <= 0 ? fallbackHsp : hsp[index];
+      return monthHsp * daysInMonth[index];
+    }).fold<double>(0, (sum, item) => sum + item);
   }
 }
 
