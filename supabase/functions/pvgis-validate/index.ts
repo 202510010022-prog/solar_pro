@@ -41,6 +41,35 @@ type PvgisPayload = {
   system_loss_percent?: number | string;
 };
 
+type GeocodingLevel =
+  | "street_number"
+  | "street"
+  | "neighborhood"
+  | "postal_code"
+  | "city";
+
+type GeocodingAttempt = {
+  level: GeocodingLevel;
+  query?: string;
+  structured?: Record<string, string>;
+  expected: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    houseNumber: string;
+  };
+};
+
+const nominatimDelayMs = 1100;
+const nominatimTimeoutMs = 12000;
+const nominatimHeaders = {
+  "Accept": "application/json",
+  "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.6",
+  "Referer": "https://solarpro.app",
+  "User-Agent": "SolarPro/1.0 (https://solarpro.app)",
+};
+
 Deno.serve(async (request) => {
   corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
 
@@ -140,6 +169,9 @@ Deno.serve(async (request) => {
       longitude,
       location_source: location.source,
       location_label: location.label,
+      geocoding_provider: location.geocodingProvider,
+      geocoding_level: location.geocodingLevel,
+      geocoding_result_type: location.geocodingResultType,
     });
   } catch (error) {
     return jsonResponse(
@@ -280,20 +312,26 @@ async function resolveLocation(payload: PvgisPayload) {
       longitude,
       source: "current_location",
       label: "Localização atual",
+      geocodingProvider: null,
+      geocodingLevel: null,
+      geocodingResultType: null,
     };
   }
 
-  const queries = addressQueries(payload.address);
-  if (queries.length === 0) {
+  const attempts = geocodingAttempts(payload.address);
+  if (attempts.length === 0) {
     return {
       error:
-        "Endereço do cliente incompleto. Cadastre pelo menos CEP, cidade e estado do cliente.",
+        "Endereço insuficiente. Informe pelo menos cidade e estado para localizar o projeto.",
     };
   }
 
   let lastError = "";
-  for (const query of queries) {
-    const result = await geocode(query);
+  let calledNominatim = false;
+  for (const attempt of attempts) {
+    if (calledNominatim) await delay(nominatimDelayMs);
+    const result = await geocodeAttempt(attempt);
+    calledNominatim = true;
     if ("error" in result) {
       lastError = result.error;
       continue;
@@ -308,24 +346,28 @@ async function resolveLocation(payload: PvgisPayload) {
   };
 }
 
-async function geocode(query: string) {
+async function geocodeAttempt(attempt: GeocodingAttempt) {
   const params = new URLSearchParams({
     format: "jsonv2",
-    q: query,
-    limit: "1",
+    limit: "3",
     countrycodes: "br",
+    addressdetails: "1",
   });
+  if (attempt.query) {
+    params.set("q", attempt.query);
+  } else if (attempt.structured) {
+    for (const [key, value] of Object.entries(attempt.structured)) {
+      if (value) params.set(key, value);
+    }
+  }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), nominatimTimeoutMs);
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?${params.toString()}`,
       {
-        headers: {
-          "Accept": "application/json",
-          "User-Agent": "SolarPro/0.1 contato@solarpro.local",
-        },
+        headers: nominatimHeaders,
         signal: controller.signal,
       },
     );
@@ -338,18 +380,11 @@ async function geocode(query: string) {
       return { error: "" };
     }
 
-    const latitude = toNumber(data[0]?.lat);
-    const longitude = toNumber(data[0]?.lon);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return { error: "Geocodificação retornou coordenadas inválidas." };
+    for (const candidate of data) {
+      const selected = selectGeocodingCandidate(attempt, candidate);
+      if (selected) return selected;
     }
-
-    return {
-      latitude,
-      longitude,
-      source: "client_address",
-      label: `${data[0]?.display_name || query}`,
-    };
+    return { error: "" };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return { error: "Geocodificação demorou demais para responder." };
@@ -364,33 +399,181 @@ async function geocode(query: string) {
   }
 }
 
-function addressQueries(address?: PvgisPayload["address"]) {
+function selectGeocodingCandidate(attempt: GeocodingAttempt, candidate: any) {
+  const latitude = toNumber(candidate?.lat);
+  const longitude = toNumber(candidate?.lon);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  const address = candidate?.address || {};
+  if (hasStateMismatch(attempt.expected.state, address)) return null;
+  if (hasCityMismatch(attempt.expected.city, address)) return null;
+  if (
+    ["street_number", "street"].includes(attempt.level) &&
+    hasRoadMismatch(attempt.expected.street, address)
+  ) {
+    return null;
+  }
+
+  // CEPs can be stale in OSM/CEP providers, so only postal-code-level
+  // attempts reject an explicit postcode mismatch.
+  if (attempt.level === "postal_code" && attempt.expected.zip) {
+    const postcode = onlyDigits(address?.postcode);
+    if (postcode && postcode !== attempt.expected.zip) return null;
+  }
+
+  if (attempt.level === "street_number" && attempt.expected.houseNumber) {
+    const houseNumber = clean(address?.house_number);
+    if (houseNumber && !sameText(houseNumber, attempt.expected.houseNumber)) {
+      return null;
+    }
+  }
+
+  return {
+    latitude,
+    longitude,
+    source: "client_address",
+    label: `${candidate?.display_name || geocodingAttemptLabel(attempt)}`,
+    geocodingProvider: "nominatim",
+    geocodingLevel: attempt.level,
+    geocodingResultType: nullableClean(candidate?.addresstype || candidate?.type),
+  };
+}
+
+function geocodingAttempts(address?: PvgisPayload["address"]) {
   if (!address) return [];
   const street = clean(address.street);
   const number = clean(address.address_number);
   const neighborhood = clean(address.neighborhood);
   const city = clean(address.city);
-  const state = clean(address.state);
+  const state = clean(address.state).toUpperCase();
   const zip = onlyDigits(address.zip_code);
-  const streetNumber = [street, number].filter(Boolean).join(", ");
-  const queries = [
-    joinQuery([streetNumber, neighborhood, city, state, zip, "Brasil"]),
-    joinQuery([streetNumber, city, state, "Brasil"]),
-    joinQuery([neighborhood, city, state, "Brasil"]),
-    joinQuery([zip, city, state, "Brasil"]),
-    joinQuery([city, state, "Brasil"]),
-    joinQuery([zip, "Brasil"]),
-  ].filter(Boolean);
 
-  return [...new Set(queries)];
+  if (!city || !/^[A-Z]{2}$/.test(state)) return [];
+
+  const expected = { street, city, state, zip, houseNumber: number };
+  const attempts: GeocodingAttempt[] = [];
+
+  if (street && number) {
+    attempts.push({
+      level: "street_number",
+      structured: {
+        street: `${number} ${street}`,
+        city,
+        state,
+        postalcode: zip,
+        country: "Brasil",
+      },
+      expected,
+    });
+  }
+  if (street) {
+    attempts.push({
+      level: "street",
+      structured: { street, city, state, country: "Brasil" },
+      expected,
+    });
+  }
+  if (neighborhood) {
+    attempts.push({
+      level: "neighborhood",
+      query: joinQuery([neighborhood, city, state, "Brasil"]),
+      expected,
+    });
+  }
+  if (zip) {
+    attempts.push({
+      level: "postal_code",
+      structured: { postalcode: zip, city, state, country: "Brasil" },
+      expected,
+    });
+  }
+  attempts.push({
+    level: "city",
+    structured: { city, state, country: "Brasil" },
+    expected,
+  });
+
+  return attempts;
 }
 
-function joinQuery(parts: string[]) {
+function hasStateMismatch(expectedState: string, address: any) {
+  const resultState = stateCodeFromAddress(address);
+  return resultState !== null && resultState !== expectedState;
+}
+
+function stateCodeFromAddress(address: any) {
+  const values = Object.values(address || {});
+  for (const value of values) {
+    const match = `${value ?? ""}`.toUpperCase().match(/\bBR-([A-Z]{2})\b/);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function hasCityMismatch(expectedCity: string, address: any) {
+  const resultCity = [
+    address?.city,
+    address?.town,
+    address?.village,
+    address?.municipality,
+  ].map(nullableClean).find(Boolean);
+  return resultCity !== undefined && !sameText(resultCity, expectedCity);
+}
+
+function hasRoadMismatch(expectedStreet: string, address: any) {
+  const resultRoad = nullableClean(address?.road);
+  if (!expectedStreet || !resultRoad) return false;
+  return !textLooksCompatible(resultRoad, expectedStreet);
+}
+
+function geocodingAttemptLabel(attempt: GeocodingAttempt) {
+  if (attempt.query) return attempt.query;
+  const parts = [
+    attempt.structured?.street,
+    attempt.structured?.postalcode,
+    attempt.structured?.city,
+    attempt.structured?.state,
+    attempt.structured?.country,
+  ];
+  return joinQuery(parts);
+}
+
+function joinQuery(parts: Array<string | undefined>) {
   return parts.map(clean).filter(Boolean).join(", ");
 }
 
 function clean(value: unknown) {
   return `${value ?? ""}`.trim().replace(/\s+/g, " ");
+}
+
+function nullableClean(value: unknown) {
+  const text = clean(value);
+  return text || null;
+}
+
+function sameText(a: unknown, b: unknown) {
+  return normalizeText(a) === normalizeText(b);
+}
+
+function textLooksCompatible(a: unknown, b: unknown) {
+  const normalizedA = normalizeText(a);
+  const normalizedB = normalizeText(b);
+  return (
+    normalizedA === normalizedB ||
+    normalizedA.includes(normalizedB) ||
+    normalizedB.includes(normalizedA)
+  );
+}
+
+function normalizeText(value: unknown) {
+  return clean(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function onlyDigits(value: unknown) {

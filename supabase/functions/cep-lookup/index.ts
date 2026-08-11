@@ -27,6 +27,17 @@ type CepPayload = {
   cep?: string;
 };
 
+type CepLookupData = {
+  zipCode: string;
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  source: "viacep" | "brasilapi";
+};
+
+const providerTimeoutMs = 6000;
+
 Deno.serve(async (request) => {
   corsHeaders = getCorsHeaders(request.headers.get("Origin") ?? undefined);
 
@@ -45,34 +56,21 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: "Informe um CEP com 8 números." }, 400);
     }
 
-    const viacep = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-    if (viacep.ok) {
-      const data = await viacep.json();
-      if (!data?.erro) {
+    const providers = [lookupViaCep, lookupBrasilApi];
+    for (const provider of providers) {
+      const result = await provider(cep).catch(() => null);
+      if (result && hasMinimumAddress(result)) {
         return jsonResponse({
           ok: true,
-          zip_code: cep,
-          street: `${data.logradouro || ""}`.trim(),
-          neighborhood: `${data.bairro || ""}`.trim(),
-          city: `${data.localidade || ""}`.trim(),
-          state: `${data.uf || ""}`.trim().toUpperCase(),
-          source: "viacep",
+          zip_code: result.zipCode,
+          street: result.street,
+          neighborhood: result.neighborhood,
+          city: result.city,
+          state: result.state,
+          source: result.source,
+          address_resolution: addressResolution(result),
         });
       }
-    }
-
-    const brasilApi = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
-    if (brasilApi.ok) {
-      const data = await brasilApi.json();
-      return jsonResponse({
-        ok: true,
-        zip_code: cep,
-        street: `${data.street || ""}`.trim(),
-        neighborhood: `${data.neighborhood || ""}`.trim(),
-        city: `${data.city || ""}`.trim(),
-        state: `${data.state || ""}`.trim().toUpperCase(),
-        source: "brasilapi",
-      });
     }
 
     return jsonResponse({ error: "CEP não encontrado." }, 404);
@@ -84,8 +82,68 @@ Deno.serve(async (request) => {
   }
 });
 
+async function lookupViaCep(cep: string): Promise<CepLookupData | null> {
+  const response = await fetchWithTimeout(
+    `https://viacep.com.br/ws/${cep}/json/`,
+  );
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  if (data?.erro) return null;
+
+  return {
+    zipCode: cep,
+    street: clean(data.logradouro),
+    neighborhood: clean(data.bairro),
+    city: clean(data.localidade),
+    state: clean(data.uf).toUpperCase(),
+    source: "viacep",
+  };
+}
+
+async function lookupBrasilApi(cep: string): Promise<CepLookupData | null> {
+  const response = await fetchWithTimeout(
+    `https://brasilapi.com.br/api/cep/v2/${cep}`,
+  );
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  return {
+    zipCode: cep,
+    street: clean(data.street),
+    neighborhood: clean(data.neighborhood),
+    city: clean(data.city),
+    state: clean(data.state).toUpperCase(),
+    source: "brasilapi",
+  };
+}
+
+async function fetchWithTimeout(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), providerTimeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function hasMinimumAddress(data: CepLookupData) {
+  return data.city.length > 0 && /^[A-Z]{2}$/.test(data.state);
+}
+
+function addressResolution(data: CepLookupData) {
+  if (data.street) return "street";
+  if (data.neighborhood) return "neighborhood";
+  return "locality";
+}
+
 function onlyDigits(value: unknown) {
   return `${value ?? ""}`.replace(/\D/g, "");
+}
+
+function clean(value: unknown) {
+  return `${value ?? ""}`.trim().replace(/\s+/g, " ");
 }
 
 function bearerToken(request: Request) {

@@ -125,6 +125,7 @@ class CepLookupResult {
     required this.city,
     required this.state,
     required this.source,
+    this.addressResolution,
   });
 
   final String zipCode;
@@ -133,6 +134,7 @@ class CepLookupResult {
   final String city;
   final String state;
   final String source;
+  final String? addressResolution;
 
   factory CepLookupResult.fromMap(Map<String, dynamic> map) {
     return CepLookupResult(
@@ -142,6 +144,13 @@ class CepLookupResult {
       city: '${map['city'] ?? ''}',
       state: '${map['state'] ?? ''}',
       source: '${map['source'] ?? ''}',
+      addressResolution: _nullableString(map['address_resolution']),
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final raw = '$value'.trim();
+    return raw.isEmpty || raw == 'null' ? null : raw;
   }
 }

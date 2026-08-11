@@ -103,6 +103,9 @@ void main() {
     expect(result.pvgisLSpecPercent, isNull);
     expect(result.pvgisLTgPercent, isNull);
     expect(result.pvgisLTotalPercent, isNull);
+    expect(result.geocodingProvider, isNull);
+    expect(result.geocodingLevel, isNull);
+    expect(result.geocodingResultType, isNull);
   });
 
   test('interpreta metricas PVGIS estendidas do payload completo', () {
@@ -139,6 +142,9 @@ void main() {
       'pvgis_l_spec_percent': null,
       'pvgis_l_tg_percent': -9.13,
       'pvgis_l_total_percent': -23.96,
+      'geocoding_provider': 'nominatim',
+      'geocoding_level': 'street',
+      'geocoding_result_type': 'residential',
     });
 
     expect(result.pvgisAnnualGenerationSource, 'E_y');
@@ -157,6 +163,9 @@ void main() {
     expect(result.pvgisLSpecPercent, isNull);
     expect(result.pvgisLTgPercent, -9.13);
     expect(result.pvgisLTotalPercent, -23.96);
+    expect(result.geocodingProvider, 'nominatim');
+    expect(result.geocodingLevel, 'street');
+    expect(result.geocodingResultType, 'residential');
 
     expect(result.monthlyHsp, hasLength(12));
     expect(result.monthlyGenerations, hasLength(12));

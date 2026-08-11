@@ -28,6 +28,9 @@ class PvgisValidationResult {
     this.pvgisLSpecPercent,
     this.pvgisLTgPercent,
     this.pvgisLTotalPercent,
+    this.geocodingProvider,
+    this.geocodingLevel,
+    this.geocodingResultType,
   });
 
   final double estimatedAnnualGeneration;
@@ -69,6 +72,9 @@ class PvgisValidationResult {
   final double? pvgisLSpecPercent;
   final double? pvgisLTgPercent;
   final double? pvgisLTotalPercent;
+  final String? geocodingProvider;
+  final String? geocodingLevel;
+  final String? geocodingResultType;
 
   double get absoluteDifferencePercent => differencePercent.abs();
   bool get isPvgisHigher => differencePercent > 0;
@@ -121,6 +127,9 @@ class PvgisValidationResult {
       pvgisLSpecPercent: _nullableDouble(map['pvgis_l_spec_percent']),
       pvgisLTgPercent: _nullableDouble(map['pvgis_l_tg_percent']),
       pvgisLTotalPercent: _nullableDouble(map['pvgis_l_total_percent']),
+      geocodingProvider: _nullableString(map['geocoding_provider']),
+      geocodingLevel: _nullableString(map['geocoding_level']),
+      geocodingResultType: _nullableString(map['geocoding_result_type']),
     );
   }
 
