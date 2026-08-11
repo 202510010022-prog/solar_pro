@@ -790,9 +790,12 @@ class _SizingPageState extends State<SizingPage> {
       );
       if (!mounted) return;
       setState(() => pvgisValidation = validation);
+      final threshold = _formatPercent(
+        PvgisValidationResult.reviewThresholdPercent,
+      );
       _message(validation.needsReview
-          ? 'Diferença entre os métodos acima de 15%. Revise as premissas.'
-          : 'Comparação PVGIS dentro da faixa atual.');
+          ? 'Diferença entre os métodos acima de $threshold. Revise as premissas.'
+          : 'Comparação PVGIS dentro da faixa de $threshold.');
     } catch (error) {
       if (!mounted) return;
       _message(_friendlyPvgisError(error));
@@ -869,6 +872,12 @@ class _SizingPageState extends State<SizingPage> {
   }
 
   String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
+
+  String _formatPercent(double value) {
+    final rounded = value.roundToDouble();
+    if ((value - rounded).abs() < 0.001) return '${rounded.toInt()}%';
+    return '${value.toStringAsFixed(1).replaceAll('.', ',')}%';
+  }
 }
 
 class _MaterialItem {
@@ -1077,13 +1086,18 @@ class _PvgisValidationCard extends StatelessWidget {
         : needsReview
             ? AppTheme.orange
             : AppTheme.green;
-    final label = data == null ? 'Não validado' : data.badgeLabel;
+    final label = data == null ? 'Não comparado' : data.badgeLabel;
     final solarProPrLabel =
         'Solar Pro (PR ${(sizingPerformanceRatio * 100).toStringAsFixed(0)}%)';
     final pvgisLoss = data?.pvgisSystemLossPercent;
     final pvgisLabel = pvgisLoss == null
         ? 'PVGIS'
         : 'PVGIS (perdas sistema ${pvgisLoss.toStringAsFixed(0)}%)';
+    final threshold =
+        _formatPercent(PvgisValidationResult.reviewThresholdPercent);
+    final comparisonText = data == null
+        ? 'Compare a estimativa simplificada do Solar Pro com a simulação do PVGIS.'
+        : _pvgisComparisonText(data);
 
     return Container(
       width: double.infinity,
@@ -1124,9 +1138,7 @@ class _PvgisValidationCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      data == null
-                          ? 'Compare a estimativa simplificada do Solar Pro com a simulação do PVGIS.'
-                          : 'Diferença entre métodos: ${data.differencePercent.toStringAsFixed(1)}%.',
+                      comparisonText,
                       style:
                           const TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),
@@ -1175,6 +1187,15 @@ class _PvgisValidationCard extends StatelessWidget {
               value: '${data.pvgisAnnualGeneration.toStringAsFixed(0)} kWh',
             ),
             const SizedBox(height: 4),
+            Text(
+              'Faixa de revisão Solar Pro: ±$threshold.',
+              style: const TextStyle(
+                color: AppTheme.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
             const Text(
               'O PR do Solar Pro e as perdas informadas ao PVGIS são premissas de modelos diferentes e não são diretamente equivalentes.',
               style: TextStyle(color: AppTheme.muted, fontSize: 12),
@@ -1189,7 +1210,7 @@ class _PvgisValidationCard extends StatelessWidget {
                 onPressed: validating ? null : onValidate,
                 icon: const Icon(Icons.public_rounded, size: 17),
                 label: Text(
-                  validating ? 'Validando...' : 'Validar endereço no PVGIS',
+                  validating ? 'Comparando...' : 'Comparar com PVGIS',
                 ),
               ),
               if (data != null && needsReview)
@@ -1209,6 +1230,28 @@ class _PvgisValidationCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _pvgisComparisonText(PvgisValidationResult data) {
+    if (data.isEquivalentForDisplay) {
+      return 'Os dois métodos apresentam geração anual equivalente.';
+    }
+
+    final percent =
+        data.absoluteDifferencePercent.toStringAsFixed(1).replaceAll('.', ',');
+    if (data.isPvgisHigher) {
+      return 'PVGIS estima $percent% mais geração que o Solar Pro.';
+    }
+    if (data.isPvgisLower) {
+      return 'PVGIS estima $percent% menos geração que o Solar Pro.';
+    }
+    return 'Os dois métodos apresentam geração anual equivalente.';
+  }
+
+  String _formatPercent(double value) {
+    final rounded = value.roundToDouble();
+    if ((value - rounded).abs() < 0.001) return '${rounded.toInt()}%';
+    return '${value.toStringAsFixed(1).replaceAll('.', ',')}%';
   }
 }
 

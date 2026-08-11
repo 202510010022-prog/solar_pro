@@ -2,6 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:solarpro_mobile/services/pvgis_validation_service.dart';
 
 void main() {
+  PvgisValidationResult resultWithDifference(double differencePercent) {
+    return PvgisValidationResult.fromMap({
+      'estimated_annual_generation': 6000,
+      'pvgis_annual_generation': 6200,
+      'monthly_generations': List<double>.filled(12, 500),
+      'monthly_hsp': List<double>.filled(12, 5.42),
+      'difference_percent': differencePercent,
+      'latitude': -9.4,
+      'longitude': -38.2,
+      'location_source': 'client_address',
+      'location_label': 'Paulo Afonso, BA',
+    });
+  }
+
   test('interpreta monthly_hsp como 12 valores de HSP medio diario', () {
     final result = PvgisValidationResult.fromMap({
       'estimated_annual_generation': 6000,
@@ -51,5 +65,48 @@ void main() {
     expect(result.pvAzimuth, isNull);
     expect(result.pvgisAspect, isNull);
     expect(result.pvgisSystemLossPercent, isNull);
+  });
+
+  test('usa limite de revisao Solar Pro com fronteira inclusiva em 15%', () {
+    expect(PvgisValidationResult.reviewThresholdPercent, 15);
+
+    final belowThreshold = resultWithDifference(14.9);
+    expect(belowThreshold.needsReview, isFalse);
+    expect(belowThreshold.badgeLabel, 'OK');
+
+    final exactThreshold = resultWithDifference(15.0);
+    expect(exactThreshold.needsReview, isFalse);
+    expect(exactThreshold.badgeLabel, 'OK');
+
+    final aboveThreshold = resultWithDifference(15.1);
+    expect(aboveThreshold.needsReview, isTrue);
+    expect(aboveThreshold.badgeLabel, 'Revisar');
+  });
+
+  test('aplica o mesmo limite para diferencas negativas', () {
+    final belowThreshold = resultWithDifference(-14.9);
+    expect(belowThreshold.needsReview, isFalse);
+    expect(belowThreshold.badgeLabel, 'OK');
+
+    final exactThreshold = resultWithDifference(-15.0);
+    expect(exactThreshold.needsReview, isFalse);
+    expect(exactThreshold.badgeLabel, 'OK');
+
+    final aboveThreshold = resultWithDifference(-15.1);
+    expect(aboveThreshold.needsReview, isTrue);
+    expect(aboveThreshold.badgeLabel, 'Revisar');
+  });
+
+  test('preserva direcao e expoe magnitude absoluta da diferenca', () {
+    final pvgisHigher = resultWithDifference(10);
+    expect(pvgisHigher.isPvgisHigher, isTrue);
+    expect(pvgisHigher.isPvgisLower, isFalse);
+
+    final pvgisLower = resultWithDifference(-10);
+    expect(pvgisLower.isPvgisHigher, isFalse);
+    expect(pvgisLower.isPvgisLower, isTrue);
+
+    final negativeDifference = resultWithDifference(-12.5);
+    expect(negativeDifference.absoluteDifferencePercent, 12.5);
   });
 }

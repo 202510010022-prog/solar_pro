@@ -1,4 +1,7 @@
 class PvgisValidationResult {
+  static const reviewThresholdPercent = 15.0;
+  static const presentationEquivalenceThresholdPercent = 0.05;
+
   const PvgisValidationResult({
     required this.estimatedAnnualGeneration,
     required this.pvgisAnnualGeneration,
@@ -33,7 +36,12 @@ class PvgisValidationResult {
   final double? pvgisAspect;
   final double? pvgisSystemLossPercent;
 
-  bool get needsReview => differencePercent.abs() > 15;
+  double get absoluteDifferencePercent => differencePercent.abs();
+  bool get isPvgisHigher => differencePercent > 0;
+  bool get isPvgisLower => differencePercent < 0;
+  bool get isEquivalentForDisplay =>
+      absoluteDifferencePercent < presentationEquivalenceThresholdPercent;
+  bool get needsReview => absoluteDifferencePercent > reviewThresholdPercent;
   String get badgeLabel => needsReview ? 'Revisar' : 'OK';
 
   factory PvgisValidationResult.fromMap(Map<String, dynamic> map) {
