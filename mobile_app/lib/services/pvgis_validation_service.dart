@@ -18,6 +18,8 @@ class PvgisValidationResult {
   final double estimatedAnnualGeneration;
   final double pvgisAnnualGeneration;
   final List<double> monthlyGenerations;
+
+  /// HSP médio diário de cada mês em h/dia, vindo do PVGIS H(i)_d.
   final List<double> monthlyHsp;
   final double differencePercent;
   final double latitude;

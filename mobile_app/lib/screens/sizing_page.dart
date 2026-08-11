@@ -330,10 +330,10 @@ class _SizingPageState extends State<SizingPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _stepTitle('2', 'Consumo e HSP mês a mês'),
+              _stepTitle('2', 'Consumo e HSP diário por mês'),
               const SizedBox(height: 6),
               const Text(
-                'Informe o consumo em kWh. O HSP pode ser preenchido automaticamente pelo endereço deste orçamento.',
+                'Informe o consumo em kWh. O HSP médio diário de cada mês pode ser preenchido pelo PVGIS.',
                 style: TextStyle(color: AppTheme.muted),
               ),
               const SizedBox(height: 10),
@@ -356,7 +356,7 @@ class _SizingPageState extends State<SizingPage> {
                     ),
                     const SizedBox(height: 3),
                     const Text(
-                      'Use o endereço deste orçamento para preencher a irradiação mensal automaticamente.',
+                      'Use o endereço do projeto para preencher o HSP médio diário de cada mês, calculado no plano otimizado dos módulos.',
                       style: TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 10),
@@ -406,7 +406,7 @@ class _SizingPageState extends State<SizingPage> {
                           ),
                           Expanded(child: _field('kWh', consumption[index])),
                           const SizedBox(width: 8),
-                          Expanded(child: _field('HSP', hsp[index])),
+                          Expanded(child: _field('HSP (h/dia)', hsp[index])),
                         ],
                       );
                     },
@@ -734,7 +734,7 @@ class _SizingPageState extends State<SizingPage> {
         address: address,
       );
       if (lookup.monthlyHsp.length < 12) {
-        _message('PVGIS não retornou HSP mensal completo.');
+        _message('PVGIS não retornou HSP médio diário completo.');
         return;
       }
 
@@ -743,7 +743,7 @@ class _SizingPageState extends State<SizingPage> {
       }
       calculate();
       if (!mounted) return;
-      _message('HSP mensal preenchido pelo endereço deste orçamento.');
+      _message('HSP médio diário preenchido pelo PVGIS.');
     } catch (error) {
       if (!mounted) return;
       _message(_friendlyPvgisError(error));
@@ -1124,7 +1124,7 @@ class _PvgisValidationCard extends StatelessWidget {
                       Text(
                         data!.locationSource == 'current_location'
                             ? 'Usando localização atual.'
-                            : 'Usando endereço do cliente.',
+                            : 'Usando endereço do projeto.',
                         style: const TextStyle(
                           color: AppTheme.muted,
                           fontSize: 12,

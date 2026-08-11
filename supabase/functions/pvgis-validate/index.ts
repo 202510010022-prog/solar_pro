@@ -92,10 +92,12 @@ Deno.serve(async (request) => {
     }
     const monthlyHsp = monthly
       .slice(0, 12)
+      // H(i)_d is average daily plane-of-array irradiation (kWh/m²/day).
+      // Its numeric value is used as monthly average daily HSP (h/day).
       .map((item) => toNumber(item?.["H(i)_d"]))
       .filter((value) => value > 0);
     if (monthlyHsp.length < 12) {
-      return jsonResponse({ error: "PVGIS retornou HSP mensal incompleto." }, 502);
+      return jsonResponse({ error: "PVGIS retornou HSP médio diário incompleto." }, 502);
     }
 
     const pvgisAnnual = monthlyGenerations.reduce((sum, value) => sum + value, 0);
