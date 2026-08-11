@@ -53,6 +53,7 @@ class _SizingPageState extends State<SizingPage> {
 
   SizingResult? result;
   PvgisValidationResult? pvgisValidation;
+  PvgisValidationResult? hspPvgisLookup;
   double projectCost = 0;
   List<Client> clients = [];
   Client? selectedClient;
@@ -60,6 +61,7 @@ class _SizingPageState extends State<SizingPage> {
   bool saving = false;
   bool validatingPvgis = false;
   bool loadingHsp = false;
+  bool pvgisGenerationApplied = false;
 
   static const months = [
     'Jan',
@@ -189,6 +191,7 @@ class _SizingPageState extends State<SizingPage> {
       projectCost = cost;
       if (!keepPvgisValidation) {
         pvgisValidation = null;
+        pvgisGenerationApplied = false;
       }
     });
   }
@@ -332,7 +335,7 @@ class _SizingPageState extends State<SizingPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _stepTitle('2', 'Consumo e HSP diário por mês'),
+              _stepTitle('2', 'Consumo e HSP médio diário por mês'),
               const SizedBox(height: 6),
               const Text(
                 'Informe o consumo em kWh. O HSP médio diário de cada mês pode ser preenchido pelo PVGIS.',
@@ -380,6 +383,10 @@ class _SizingPageState extends State<SizingPage> {
                             : 'Preencher HSP automaticamente',
                       ),
                     ),
+                    if (hspPvgisLookup != null) ...[
+                      const SizedBox(height: 10),
+                      _HspPvgisSourceCard(lookup: hspPvgisLookup!),
+                    ],
                   ],
                 ),
               ),
@@ -408,7 +415,13 @@ class _SizingPageState extends State<SizingPage> {
                           ),
                           Expanded(child: _field('kWh', consumption[index])),
                           const SizedBox(width: 8),
-                          Expanded(child: _field('HSP (h/dia)', hsp[index])),
+                          Expanded(
+                            child: _field(
+                              'HSP (h/dia)',
+                              hsp[index],
+                              onChanged: (_) => _clearHspLookupMetadata(),
+                            ),
+                          ),
                         ],
                       );
                     },
@@ -549,6 +562,7 @@ class _SizingPageState extends State<SizingPage> {
                   validation: pvgisValidation,
                   validating: validatingPvgis,
                   sizingPerformanceRatio: _sizingPerformanceRatio,
+                  pvgisGenerationApplied: pvgisGenerationApplied,
                   onValidate: validateWithPvgis,
                   onAdjust: adjustWithPvgis,
                   onAccept: acceptPvgisValidation,
@@ -599,9 +613,14 @@ class _SizingPageState extends State<SizingPage> {
     );
   }
 
-  Widget _field(String label, TextEditingController controller) {
+  Widget _field(
+    String label,
+    TextEditingController controller, {
+    ValueChanged<String>? onChanged,
+  }) {
     return TextField(
       controller: controller,
+      onChanged: onChanged,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(labelText: label),
     );
@@ -746,6 +765,7 @@ class _SizingPageState extends State<SizingPage> {
       }
       calculate();
       if (!mounted) return;
+      setState(() => hspPvgisLookup = lookup);
       _message('HSP médio diário preenchido pelo PVGIS.');
     } catch (error) {
       if (!mounted) return;
@@ -789,7 +809,10 @@ class _SizingPageState extends State<SizingPage> {
         estimatedAnnualGeneration: data.annualGeneration,
       );
       if (!mounted) return;
-      setState(() => pvgisValidation = validation);
+      setState(() {
+        pvgisValidation = validation;
+        pvgisGenerationApplied = false;
+      });
       final threshold = _formatPercent(
         PvgisValidationResult.reviewThresholdPercent,
       );
@@ -845,13 +868,19 @@ class _SizingPageState extends State<SizingPage> {
         tariff: _number(tariff),
         projectValue: projectCost,
       );
+      pvgisGenerationApplied = true;
     });
     _message('Geração ajustada com base no PVGIS.');
   }
 
   void acceptPvgisValidation() {
     if (pvgisValidation == null) return;
-    _message('Comparação PVGIS aceita.');
+    _message('Estimativa Solar Pro mantida.');
+  }
+
+  void _clearHspLookupMetadata() {
+    if (hspPvgisLookup == null) return;
+    setState(() => hspPvgisLookup = null);
   }
 
   void _message(String text) {
@@ -871,13 +900,13 @@ class _SizingPageState extends State<SizingPage> {
     return text;
   }
 
-  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
-
   String _formatPercent(double value) {
     final rounded = value.roundToDouble();
     if ((value - rounded).abs() < 0.001) return '${rounded.toInt()}%';
     return '${value.toStringAsFixed(1).replaceAll('.', ',')}%';
   }
+
+  String _digitsOnly(String value) => value.replaceAll(RegExp(r'\D'), '');
 }
 
 class _MaterialItem {
@@ -1060,11 +1089,81 @@ class _LocationPreview extends StatelessWidget {
   }
 }
 
+class _HspPvgisSourceCard extends StatelessWidget {
+  const _HspPvgisSourceCard({required this.lookup});
+
+  final PvgisValidationResult lookup;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[
+      _PvgisDetailRow(
+        label: 'HSP médio anual',
+        value:
+            '${_formatNumber(_weightedAnnualHsp(lookup.monthlyHsp), 2)} h/dia',
+      ),
+      if (lookup.pvgisRadiationDatabase != null)
+        _PvgisDetailRow(
+          label: 'Base solar',
+          value: lookup.pvgisRadiationDatabase!,
+        ),
+      _PvgisDetailRow(
+        label: 'Plano dos módulos',
+        value: _planeLabel(lookup),
+      ),
+      if (lookup.pvSlope != null)
+        _PvgisDetailRow(
+          label: 'Inclinação',
+          value: '${_formatDegrees(lookup.pvSlope!)}°',
+        ),
+      if (lookup.pvAzimuth != null)
+        _PvgisDetailRow(
+          label: 'Azimute',
+          value:
+              '${_formatDegrees(lookup.pvAzimuth!)}° (${_cardinalDirection(lookup.pvAzimuth!)})',
+        ),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.green.withValues(alpha: 0.16)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Preenchido pelo PVGIS',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          ...rows,
+          if (lookup.geocodingProvider == 'nominatim') ...[
+            const SizedBox(height: 4),
+            const Text(
+              '© OpenStreetMap contributors - openstreetmap.org/copyright',
+              style: TextStyle(
+                color: AppTheme.muted,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _PvgisValidationCard extends StatelessWidget {
   const _PvgisValidationCard({
     required this.validation,
     required this.validating,
     required this.sizingPerformanceRatio,
+    required this.pvgisGenerationApplied,
     required this.onValidate,
     required this.onAdjust,
     required this.onAccept,
@@ -1073,6 +1172,7 @@ class _PvgisValidationCard extends StatelessWidget {
   final PvgisValidationResult? validation;
   final bool validating;
   final double sizingPerformanceRatio;
+  final bool pvgisGenerationApplied;
   final VoidCallback onValidate;
   final VoidCallback onAdjust;
   final VoidCallback onAccept;
@@ -1080,24 +1180,30 @@ class _PvgisValidationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = validation;
-    final needsReview = data?.needsReview == true;
+    final needsReview = data?.needsReview == true && !pvgisGenerationApplied;
     final color = data == null
         ? AppTheme.primaryBlue
-        : needsReview
-            ? AppTheme.orange
-            : AppTheme.green;
-    final label = data == null ? 'Não comparado' : data.badgeLabel;
+        : pvgisGenerationApplied
+            ? AppTheme.green
+            : needsReview
+                ? AppTheme.orange
+                : AppTheme.green;
+    final label = data == null
+        ? 'Não comparado'
+        : pvgisGenerationApplied
+            ? 'PVGIS aplicado'
+            : data.badgeLabel;
     final solarProPrLabel =
         'Solar Pro (PR ${(sizingPerformanceRatio * 100).toStringAsFixed(0)}%)';
     final pvgisLoss = data?.pvgisSystemLossPercent;
     final pvgisLabel = pvgisLoss == null
         ? 'PVGIS'
         : 'PVGIS (perdas sistema ${pvgisLoss.toStringAsFixed(0)}%)';
-    final threshold =
-        _formatPercent(PvgisValidationResult.reviewThresholdPercent);
     final comparisonText = data == null
         ? 'Compare a estimativa simplificada do Solar Pro com a simulação do PVGIS.'
-        : _pvgisComparisonText(data);
+        : pvgisGenerationApplied
+            ? 'A geração mensal do resultado foi ajustada para os valores do PVGIS.'
+            : _pvgisComparisonText(data);
 
     return Container(
       width: double.infinity,
@@ -1121,7 +1227,7 @@ class _PvgisValidationCard extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
-                        needsReview
+                        needsReview && !pvgisGenerationApplied
                             ? Icons.warning_amber_rounded
                             : Icons.verified_rounded,
                         color: color,
@@ -1142,41 +1248,6 @@ class _PvgisValidationCard extends StatelessWidget {
                       style:
                           const TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),
-                    if (data?.locationLabel.trim().isNotEmpty == true) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        data!.locationSource == 'current_location'
-                            ? 'Usando localização atual.'
-                            : 'Usando endereço do projeto.',
-                        style: const TextStyle(
-                          color: AppTheme.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    if (data?.pvgisRadiationDatabase != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        'Base solar: ${data!.pvgisRadiationDatabase}',
-                        style: const TextStyle(
-                          color: AppTheme.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                    if (data?.geocodingProvider == 'nominatim') ...[
-                      const SizedBox(height: 3),
-                      const Text(
-                        'Localização: Nominatim - © OpenStreetMap contributors - openstreetmap.org/copyright',
-                        style: TextStyle(
-                          color: AppTheme.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1200,28 +1271,55 @@ class _PvgisValidationCard extends StatelessWidget {
           ),
           if (data != null) ...[
             const SizedBox(height: 12),
-            _PvgisMetric(
-              label: solarProPrLabel,
-              value: '${data.estimatedAnnualGeneration.toStringAsFixed(0)} kWh',
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 420;
+                final tiles = [
+                  _PvgisMetricTile(
+                    label: solarProPrLabel,
+                    value:
+                        '${_formatKwhYear(data.estimatedAnnualGeneration)} kWh/ano',
+                  ),
+                  _PvgisMetricTile(
+                    label: pvgisLabel,
+                    value:
+                        '${_formatKwhYear(data.pvgisAnnualGeneration)} kWh/ano',
+                  ),
+                ];
+                if (!wide) {
+                  return Column(
+                    children: [
+                      tiles.first,
+                      const SizedBox(height: 8),
+                      tiles.last,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: tiles.first),
+                    const SizedBox(width: 8),
+                    Expanded(child: tiles.last),
+                  ],
+                );
+              },
             ),
-            _PvgisMetric(
-              label: pvgisLabel,
-              value: '${data.pvgisAnnualGeneration.toStringAsFixed(0)} kWh',
+            const SizedBox(height: 10),
+            _PvgisSimulationDetails(
+              data: data,
+              sizingPerformanceRatio: sizingPerformanceRatio,
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Faixa de revisão Solar Pro: ±$threshold.',
-              style: const TextStyle(
-                color: AppTheme.muted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+            if (data.geocodingProvider == 'nominatim') ...[
+              const SizedBox(height: 8),
+              const Text(
+                '© OpenStreetMap contributors - openstreetmap.org/copyright',
+                style: TextStyle(
+                  color: AppTheme.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'O PR do Solar Pro e as perdas informadas ao PVGIS são premissas de modelos diferentes e não são diretamente equivalentes.',
-              style: TextStyle(color: AppTheme.muted, fontSize: 12),
-            ),
+            ],
           ],
           const SizedBox(height: 12),
           Wrap(
@@ -1235,17 +1333,17 @@ class _PvgisValidationCard extends StatelessWidget {
                   validating ? 'Comparando...' : 'Comparar com PVGIS',
                 ),
               ),
-              if (data != null && needsReview)
+              if (data != null && data.needsReview && !pvgisGenerationApplied)
                 ElevatedButton.icon(
                   onPressed: onAdjust,
                   icon: const Icon(Icons.tune_rounded, size: 17),
-                  label: const Text('Ajustar'),
+                  label: const Text('Usar geração PVGIS'),
                 ),
-              if (data != null)
+              if (data != null && data.needsReview && !pvgisGenerationApplied)
                 TextButton.icon(
                   onPressed: onAccept,
                   icon: const Icon(Icons.check_rounded, size: 17),
-                  label: const Text('Aceitar'),
+                  label: const Text('Manter Solar Pro'),
                 ),
             ],
           ),
@@ -1269,6 +1367,105 @@ class _PvgisValidationCard extends StatelessWidget {
     }
     return 'Os dois métodos apresentam geração anual equivalente.';
   }
+}
+
+class _PvgisSimulationDetails extends StatelessWidget {
+  const _PvgisSimulationDetails({
+    required this.data,
+    required this.sizingPerformanceRatio,
+  });
+
+  final PvgisValidationResult data;
+  final double sizingPerformanceRatio;
+
+  @override
+  Widget build(BuildContext context) {
+    final threshold = _formatPercent(
+      PvgisValidationResult.reviewThresholdPercent,
+    );
+    final rows = <Widget>[
+      if (data.pvgisRadiationDatabase != null)
+        _PvgisDetailRow(
+            label: 'Base solar', value: data.pvgisRadiationDatabase!),
+      _PvgisDetailRow(label: 'Plano dos módulos', value: _planeLabel(data)),
+      if (data.pvSlope != null)
+        _PvgisDetailRow(
+          label: 'Inclinação',
+          value: '${_formatDegrees(data.pvSlope!)}°',
+        ),
+      if (data.pvAzimuth != null)
+        _PvgisDetailRow(
+          label: 'Azimute',
+          value:
+              '${_formatDegrees(data.pvAzimuth!)}° (${_cardinalDirection(data.pvAzimuth!)})',
+        ),
+      if (data.pvgisAnnualPlaneIrradiationKwhM2 != null)
+        _PvgisDetailRow(
+          label: 'Irradiação anual no plano',
+          value:
+              '${_formatNumber(data.pvgisAnnualPlaneIrradiationKwhM2!, 0)} kWh/m²/ano',
+        ),
+      if (data.pvgisAnnualGenerationSdKwh != null)
+        _PvgisDetailRow(
+          label: 'Variabilidade anual (desvio padrão)',
+          value: '${_formatNumber(data.pvgisAnnualGenerationSdKwh!, 0)} kWh',
+        ),
+      _PvgisDetailRow(label: 'Localização', value: _locationLabel(data)),
+      if (data.geocodingProvider == 'nominatim')
+        _PvgisDetailRow(
+          label: 'Nível da localização',
+          value: _geocodingLevelLabel(data.geocodingLevel),
+        ),
+    ];
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        initiallyExpanded: false,
+        title: const Text(
+          'Detalhes da simulação',
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+        ),
+        children: [
+          ...rows,
+          if (data.locationLabel.trim().isNotEmpty) ...[
+            const SizedBox(height: 4),
+            const Text(
+              'Referência localizada',
+              style: TextStyle(
+                color: AppTheme.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              data.locationLabel,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            'Faixa de revisão Solar Pro: ±$threshold.',
+            style: const TextStyle(
+              color: AppTheme.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'O PR do Solar Pro (${(sizingPerformanceRatio * 100).toStringAsFixed(0)}%) e as perdas informadas ao PVGIS são premissas de modelos diferentes e não são diretamente equivalentes.',
+            style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 
   String _formatPercent(double value) {
     final rounded = value.roundToDouble();
@@ -1277,8 +1474,46 @@ class _PvgisValidationCard extends StatelessWidget {
   }
 }
 
-class _PvgisMetric extends StatelessWidget {
-  const _PvgisMetric({required this.label, required this.value});
+class _PvgisMetricTile extends StatelessWidget {
+  const _PvgisMetricTile({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PvgisDetailRow extends StatelessWidget {
+  const _PvgisDetailRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -1288,14 +1523,102 @@ class _PvgisMetric extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: AppTheme.muted)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+double _weightedAnnualHsp(List<double> monthlyHsp) {
+  if (monthlyHsp.length < 12) return 0;
+  var weighted = 0.0;
+  for (var i = 0; i < 12; i++) {
+    weighted += monthlyHsp[i] * SizingService.daysInMonth[i];
+  }
+  return weighted / 365;
+}
+
+String _planeLabel(PvgisValidationResult data) {
+  if (data.orientationMode == 'automatic') {
+    return 'otimizado pelo PVGIS';
+  }
+  return 'definido para a simulação';
+}
+
+String _locationLabel(PvgisValidationResult data) {
+  if (data.locationSource == 'current_location') {
+    return 'GPS do dispositivo';
+  }
+
+  switch (data.geocodingLevel) {
+    case 'street_number':
+      return 'Localização pelo endereço';
+    case 'street':
+      return 'Localização pelo logradouro';
+    case 'neighborhood':
+      return 'Localização pelo bairro';
+    case 'postal_code':
+      return 'Localização aproximada pelo CEP';
+    case 'city':
+      return 'Localização aproximada pela cidade';
+  }
+  return 'Endereço do projeto';
+}
+
+String _geocodingLevelLabel(String? level) {
+  switch (level) {
+    case 'street_number':
+      return 'Endereço com número';
+    case 'street':
+      return 'Logradouro';
+    case 'neighborhood':
+      return 'Bairro';
+    case 'postal_code':
+      return 'CEP';
+    case 'city':
+      return 'Cidade';
+  }
+  return 'Endereço';
+}
+
+String _formatKwhYear(double value) {
+  return value.round().toString();
+}
+
+String _formatNumber(double value, int fractionDigits) {
+  return value
+      .toStringAsFixed(fractionDigits)
+      .replaceAll('.', ',')
+      .replaceAll(RegExp(r',0$'), '');
+}
+
+String _formatDegrees(double value) {
+  final rounded = value.roundToDouble();
+  if ((value - rounded).abs() < 0.05) return rounded.toInt().toString();
+  return value.toStringAsFixed(1).replaceAll('.', ',');
+}
+
+String _cardinalDirection(double degrees) {
+  final normalized = ((degrees % 360) + 360) % 360;
+  const labels = ['N', 'NE', 'L', 'SE', 'S', 'SO', 'O', 'NO'];
+  final index = ((normalized + 22.5) ~/ 45) % 8;
+  return labels[index];
 }
 
 class _MonthlyBalanceBar extends StatelessWidget {
