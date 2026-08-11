@@ -13,6 +13,7 @@ class PvgisValidationResult {
     this.pvSlope,
     this.pvAzimuth,
     this.pvgisAspect,
+    this.pvgisSystemLossPercent,
   });
 
   final double estimatedAnnualGeneration;
@@ -30,6 +31,7 @@ class PvgisValidationResult {
   final double? pvSlope;
   final double? pvAzimuth;
   final double? pvgisAspect;
+  final double? pvgisSystemLossPercent;
 
   bool get needsReview => differencePercent.abs() > 15;
   String get badgeLabel => needsReview ? 'Revisar' : 'OK';
@@ -54,6 +56,7 @@ class PvgisValidationResult {
       pvSlope: _nullableDouble(map['pv_slope']),
       pvAzimuth: _nullableDouble(map['pv_azimuth']),
       pvgisAspect: _nullableDouble(map['pvgis_aspect']),
+      pvgisSystemLossPercent: _nullableDouble(map['pvgis_system_loss_percent']),
     );
   }
 

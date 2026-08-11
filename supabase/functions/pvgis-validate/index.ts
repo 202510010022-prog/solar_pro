@@ -112,6 +112,7 @@ Deno.serve(async (request) => {
       pv_slope: pvOrientation.slope,
       pv_azimuth: pvOrientation.azimuth,
       pvgis_aspect: pvOrientation.pvgisAspect,
+      pvgis_system_loss_percent: loss,
       estimated_annual_generation: estimatedAnnual,
       pvgis_annual_generation: pvgisAnnual,
       monthly_generations: monthlyGenerations,

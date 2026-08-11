@@ -27,6 +27,8 @@ class SizingPage extends StatefulWidget {
 }
 
 class _SizingPageState extends State<SizingPage> {
+  static const _sizingPerformanceRatio = 0.80;
+
   final service = SizingService();
   final consumption =
       List.generate(12, (_) => TextEditingController(text: '500'));
@@ -168,7 +170,7 @@ class _SizingPageState extends State<SizingPage> {
       monthlyConsumption: consumption.map(_number).toList(),
       monthlyHsp: hsp.map(_number).toList(),
       generationExtraPercent: _number(extra),
-      performanceRatio: 0.8,
+      performanceRatio: _sizingPerformanceRatio,
       modulePower: _number(modulePower),
       tariff: _number(tariff),
       projectValue: 0,
@@ -179,7 +181,7 @@ class _SizingPageState extends State<SizingPage> {
         monthlyConsumption: consumption.map(_number).toList(),
         monthlyHsp: hsp.map(_number).toList(),
         generationExtraPercent: _number(extra),
-        performanceRatio: 0.8,
+        performanceRatio: _sizingPerformanceRatio,
         modulePower: _number(modulePower),
         tariff: _number(tariff),
         projectValue: cost,
@@ -235,7 +237,7 @@ class _SizingPageState extends State<SizingPage> {
         monthlyConsumption: consumption.map(_number).toList(),
         monthlyHsp: hsp.map(_number).toList(),
         generationExtraPercent: _number(extra),
-        performanceRatio: 0.8,
+        performanceRatio: _sizingPerformanceRatio,
         modulePower: _number(modulePower),
         tariff: _number(tariff),
         projectValue: projectCost,
@@ -546,6 +548,7 @@ class _SizingPageState extends State<SizingPage> {
                 _PvgisValidationCard(
                   validation: pvgisValidation,
                   validating: validatingPvgis,
+                  sizingPerformanceRatio: _sizingPerformanceRatio,
                   onValidate: validateWithPvgis,
                   onAdjust: adjustWithPvgis,
                   onAccept: acceptPvgisValidation,
@@ -788,8 +791,8 @@ class _SizingPageState extends State<SizingPage> {
       if (!mounted) return;
       setState(() => pvgisValidation = validation);
       _message(validation.needsReview
-          ? 'PVGIS indica diferença acima de 15%.'
-          : 'PVGIS validou o dimensionamento.');
+          ? 'Diferença entre os métodos acima de 15%. Revise as premissas.'
+          : 'Comparação PVGIS dentro da faixa atual.');
     } catch (error) {
       if (!mounted) return;
       _message(_friendlyPvgisError(error));
@@ -845,7 +848,7 @@ class _SizingPageState extends State<SizingPage> {
 
   void acceptPvgisValidation() {
     if (pvgisValidation == null) return;
-    _message('Validação PVGIS aceita.');
+    _message('Comparação PVGIS aceita.');
   }
 
   void _message(String text) {
@@ -1052,6 +1055,7 @@ class _PvgisValidationCard extends StatelessWidget {
   const _PvgisValidationCard({
     required this.validation,
     required this.validating,
+    required this.sizingPerformanceRatio,
     required this.onValidate,
     required this.onAdjust,
     required this.onAccept,
@@ -1059,6 +1063,7 @@ class _PvgisValidationCard extends StatelessWidget {
 
   final PvgisValidationResult? validation;
   final bool validating;
+  final double sizingPerformanceRatio;
   final VoidCallback onValidate;
   final VoidCallback onAdjust;
   final VoidCallback onAccept;
@@ -1073,6 +1078,12 @@ class _PvgisValidationCard extends StatelessWidget {
             ? AppTheme.orange
             : AppTheme.green;
     final label = data == null ? 'Não validado' : data.badgeLabel;
+    final solarProPrLabel =
+        'Solar Pro (PR ${(sizingPerformanceRatio * 100).toStringAsFixed(0)}%)';
+    final pvgisLoss = data?.pvgisSystemLossPercent;
+    final pvgisLabel = pvgisLoss == null
+        ? 'PVGIS'
+        : 'PVGIS (perdas sistema ${pvgisLoss.toStringAsFixed(0)}%)';
 
     return Container(
       width: double.infinity,
@@ -1108,14 +1119,14 @@ class _PvgisValidationCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Validação PVGIS',
+                      'Comparação PVGIS',
                       style: TextStyle(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       data == null
-                          ? 'Compare a geração estimada com dados solares por latitude e longitude.'
-                          : 'Diferença ${data.differencePercent.toStringAsFixed(1)}% em relação ao cálculo atual.',
+                          ? 'Compare a estimativa simplificada do Solar Pro com a simulação do PVGIS.'
+                          : 'Diferença entre métodos: ${data.differencePercent.toStringAsFixed(1)}%.',
                       style:
                           const TextStyle(color: AppTheme.muted, fontSize: 12),
                     ),
@@ -1156,12 +1167,17 @@ class _PvgisValidationCard extends StatelessWidget {
           if (data != null) ...[
             const SizedBox(height: 12),
             _PvgisMetric(
-              label: 'Estimado no app',
+              label: solarProPrLabel,
               value: '${data.estimatedAnnualGeneration.toStringAsFixed(0)} kWh',
             ),
             _PvgisMetric(
-              label: 'PVGIS',
+              label: pvgisLabel,
               value: '${data.pvgisAnnualGeneration.toStringAsFixed(0)} kWh',
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'O PR do Solar Pro e as perdas informadas ao PVGIS são premissas de modelos diferentes e não são diretamente equivalentes.',
+              style: TextStyle(color: AppTheme.muted, fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),

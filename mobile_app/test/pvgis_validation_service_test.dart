@@ -18,6 +18,7 @@ void main() {
       'pv_slope': 1,
       'pv_azimuth': 1,
       'pvgis_aspect': -179,
+      'pvgis_system_loss_percent': 14,
     });
 
     expect(result.monthlyHsp, hasLength(12));
@@ -27,6 +28,7 @@ void main() {
     expect(result.pvSlope, 1);
     expect(result.pvAzimuth, 1);
     expect(result.pvgisAspect, -179);
+    expect(result.pvgisSystemLossPercent, 14);
   });
 
   test('mantem parsing retrocompativel sem campos de orientacao', () {
@@ -48,5 +50,6 @@ void main() {
     expect(result.pvSlope, isNull);
     expect(result.pvAzimuth, isNull);
     expect(result.pvgisAspect, isNull);
+    expect(result.pvgisSystemLossPercent, isNull);
   });
 }

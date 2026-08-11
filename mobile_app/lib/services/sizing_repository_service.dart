@@ -8,6 +8,8 @@ import '../models/project_status.dart';
 import 'pvgis_validation_service.dart';
 import 'sizing_service.dart';
 
+const pvgisSystemLossPercent = 14.0;
+
 class SizingRepositoryService {
   SizingRepositoryService(
     this._supabase, {
@@ -48,7 +50,7 @@ class SizingRepositoryService {
             },
           'installed_power_kwp': installedPowerKwp,
           'estimated_annual_generation': estimatedAnnualGeneration,
-          'system_loss_percent': 14,
+          'system_loss_percent': pvgisSystemLossPercent,
         },
       );
       final data = response.data;
@@ -89,7 +91,7 @@ class SizingRepositoryService {
           },
           'installed_power_kwp': 1,
           'estimated_annual_generation': 1,
-          'system_loss_percent': 14,
+          'system_loss_percent': pvgisSystemLossPercent,
         },
       );
       final data = response.data;
