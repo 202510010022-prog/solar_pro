@@ -1,25 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
+import '../models/app_profile.dart';
+import '../models/app_subscription.dart';
 import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../models/project_status.dart';
+import '../services/proposal_service.dart';
+import '../services/report_file_saver.dart';
+import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/friendly_error.dart';
 import '../widgets/monthly_energy_bars.dart';
 import '../widgets/neon_card.dart';
 import '../widgets/payment_status_badge.dart';
 
-class ProjectDetailsPage extends StatelessWidget {
+class ProjectDetailsPage extends StatefulWidget {
   const ProjectDetailsPage({
     super.key,
     required this.project,
+    required this.repository,
+    this.profile,
+    this.subscription,
     this.payments = const [],
     this.canUseFinancial = false,
   });
 
   final Project project;
+  final SolarProRepository repository;
+  final AppProfile? profile;
+  final AppSubscription? subscription;
   final List<ProjectPayment> payments;
   final bool canUseFinancial;
+
+  @override
+  State<ProjectDetailsPage> createState() => _ProjectDetailsPageState();
+}
+
+class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
+  SavedReport? proposal;
+  bool generatingProposal = false;
 
   static const months = [
     'Jan',
@@ -39,6 +60,8 @@ class ProjectDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final money = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    final project = widget.project;
+    final canExportProposal = _canExportProposal;
     return Scaffold(
       appBar: AppBar(title: const Text('Detalhes do projeto')),
       body: ListView(
@@ -55,11 +78,14 @@ class ProjectDetailsPage extends StatelessWidget {
             '${ProjectStatus.labelFor(project.status)} • ${project.projectDate}',
             style: const TextStyle(color: AppTheme.muted),
           ),
-          if (canUseFinancial) ...[
+          if (widget.canUseFinancial) ...[
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
-              child: PaymentStatusBadge(project: project, payments: payments),
+              child: PaymentStatusBadge(
+                project: project,
+                payments: widget.payments,
+              ),
             ),
           ],
           if (ProjectStatus.rejected.matches(project.status) &&
@@ -164,9 +190,69 @@ class ProjectDetailsPage extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 14),
+          _ProposalCard(
+            canExport: canExportProposal,
+            generating: generatingProposal,
+            generatedFileName: proposal?.fileName,
+            onGenerate: _generateProposal,
+            onShare: proposal == null
+                ? null
+                : () => ProposalService(widget.repository).shareProposal(
+                      proposal!,
+                    ),
+            onDownload: proposal == null
+                ? null
+                : () => ProposalService(widget.repository).downloadProposal(
+                      proposal!,
+                    ),
+            onPrint: proposal == null
+                ? null
+                : () => ProposalService(widget.repository).printProposal(
+                      proposal!,
+                    ),
+          ),
         ],
       ),
     );
+  }
+
+  bool get _canExportProposal {
+    final profile = widget.profile;
+    if (profile?.canManageAll == true) return true;
+    final sellerId = widget.project.sellerId;
+    return profile != null && sellerId != null && sellerId == profile.id;
+  }
+
+  Future<void> _generateProposal() async {
+    setState(() => generatingProposal = true);
+    try {
+      final service = ProposalService(widget.repository);
+      final generated = await service.generateProjectProposal(
+        project: widget.project,
+        subscription: widget.subscription,
+      );
+      if (!mounted) return;
+      setState(() => proposal = generated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${generated.fileName} gerado.'),
+          action: SnackBarAction(
+            label: kIsWeb ? 'Baixar' : 'Compartilhar',
+            onPressed: kIsWeb
+                ? () => service.downloadProposal(generated)
+                : () => service.shareProposal(generated),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyNetworkError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => generatingProposal = false);
+    }
   }
 
   Widget _row(String label, String value) {
@@ -222,6 +308,129 @@ class ProjectDetailsPage extends StatelessWidget {
 
   double _at(List<double> values, int index) =>
       index < values.length ? values[index] : 0;
+}
+
+class _ProposalCard extends StatelessWidget {
+  const _ProposalCard({
+    required this.canExport,
+    required this.generating,
+    required this.generatedFileName,
+    required this.onGenerate,
+    required this.onShare,
+    required this.onDownload,
+    required this.onPrint,
+  });
+
+  final bool canExport;
+  final bool generating;
+  final String? generatedFileName;
+  final VoidCallback onGenerate;
+  final VoidCallback? onShare;
+  final VoidCallback? onDownload;
+  final VoidCallback? onPrint;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeonCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.10),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Proposta comercial',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Gere um PDF individual deste orçamento para enviar ao cliente.',
+                      style: TextStyle(color: AppTheme.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!canExport) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Disponível apenas para o vendedor responsável ou gestores.',
+              style: TextStyle(
+                color: AppTheme.muted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: generating ? null : onGenerate,
+                icon: generating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.file_download_outlined),
+                label: Text(
+                  generating
+                      ? 'Gerando proposta...'
+                      : 'Exportar proposta em PDF',
+                ),
+              ),
+            ),
+            if (generatedFileName != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                generatedFileName!,
+                style: const TextStyle(
+                  color: AppTheme.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onShare,
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: const Text('Compartilhar'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onDownload,
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Baixar'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onPrint,
+                    icon: const Icon(Icons.print_rounded),
+                    label: const Text('Imprimir'),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ProjectSellerCard extends StatelessWidget {

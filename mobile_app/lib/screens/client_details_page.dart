@@ -178,6 +178,8 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
                                     MaterialPageRoute(
                                       builder: (_) => ProjectDetailsPage(
                                         project: project,
+                                        repository: widget.repository,
+                                        profile: widget.profile,
                                         payments: data.paymentsByProject[
                                                 project.id] ??
                                             const [],

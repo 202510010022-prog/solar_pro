@@ -60,7 +60,11 @@ class _HomePageState extends State<HomePage> {
         onOpenTab: (tabIndex) => setState(() => index = tabIndex),
       ),
       ClientsPage(repository: widget.repository, profile: profile),
-      ProjectsPage(repository: widget.repository, profile: profile),
+      ProjectsPage(
+        repository: widget.repository,
+        profile: profile,
+        subscription: subscription,
+      ),
       SizingPage(repository: widget.repository, subscription: subscription),
       FinancialPage(repository: widget.repository, profile: profile),
       MorePage(

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../models/project.dart';
 import '../models/app_profile.dart';
+import '../models/app_subscription.dart';
+import '../models/project.dart';
 import '../models/project_payment.dart';
 import '../models/project_status.dart';
 import '../services/solarpro_repository.dart';
@@ -14,11 +15,16 @@ import 'project_details_page.dart';
 import 'project_edit_page.dart';
 
 class ProjectsPage extends StatefulWidget {
-  const ProjectsPage(
-      {super.key, required this.repository, required this.profile});
+  const ProjectsPage({
+    super.key,
+    required this.repository,
+    required this.profile,
+    required this.subscription,
+  });
 
   final SolarProRepository repository;
   final AppProfile? profile;
+  final AppSubscription? subscription;
 
   @override
   State<ProjectsPage> createState() => _ProjectsPageState();
@@ -167,6 +173,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             const [],
                         repository: widget.repository,
                         profile: widget.profile,
+                        subscription: widget.subscription,
                         onChanged: _reload,
                       ),
                     );
@@ -221,6 +228,7 @@ class _ProjectTile extends StatefulWidget {
     required this.payments,
     required this.repository,
     required this.profile,
+    required this.subscription,
     required this.onChanged,
   });
 
@@ -228,6 +236,7 @@ class _ProjectTile extends StatefulWidget {
   final List<ProjectPayment> payments;
   final SolarProRepository repository;
   final AppProfile? profile;
+  final AppSubscription? subscription;
   final VoidCallback onChanged;
 
   @override
@@ -284,6 +293,9 @@ class _ProjectTileState extends State<_ProjectTile> {
                     MaterialPageRoute(
                       builder: (_) => ProjectDetailsPage(
                         project: widget.project,
+                        repository: widget.repository,
+                        profile: widget.profile,
+                        subscription: widget.subscription,
                         payments: widget.payments,
                         canUseFinancial:
                             widget.profile?.canUseFinancial == true,
@@ -335,6 +347,9 @@ class _ProjectTileState extends State<_ProjectTile> {
                       MaterialPageRoute(
                         builder: (_) => ProjectDetailsPage(
                           project: widget.project,
+                          repository: widget.repository,
+                          profile: widget.profile,
+                          subscription: widget.subscription,
                           payments: widget.payments,
                           canUseFinancial:
                               widget.profile?.canUseFinancial == true,
