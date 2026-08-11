@@ -33,6 +33,7 @@ void main() {
       'pv_azimuth': 1,
       'pvgis_aspect': -179,
       'pvgis_system_loss_percent': 14,
+      'pvgis_radiation_database': 'PVGIS-SARAH3',
     });
 
     expect(result.monthlyHsp, hasLength(12));
@@ -43,6 +44,24 @@ void main() {
     expect(result.pvAzimuth, 1);
     expect(result.pvgisAspect, -179);
     expect(result.pvgisSystemLossPercent, 14);
+    expect(result.pvgisRadiationDatabase, 'PVGIS-SARAH3');
+  });
+
+  test('interpreta base solar ERA5 retornada pelo PVGIS', () {
+    final result = PvgisValidationResult.fromMap({
+      'estimated_annual_generation': 6000,
+      'pvgis_annual_generation': 6200,
+      'monthly_generations': List<double>.filled(12, 500),
+      'monthly_hsp': List<double>.filled(12, 5.42),
+      'difference_percent': 3.33,
+      'latitude': -9.4,
+      'longitude': -38.2,
+      'location_source': 'client_address',
+      'location_label': 'Paulo Afonso, BA',
+      'pvgis_radiation_database': 'PVGIS-ERA5',
+    });
+
+    expect(result.pvgisRadiationDatabase, 'PVGIS-ERA5');
   });
 
   test('mantem parsing retrocompativel sem campos de orientacao', () {
@@ -65,6 +84,24 @@ void main() {
     expect(result.pvAzimuth, isNull);
     expect(result.pvgisAspect, isNull);
     expect(result.pvgisSystemLossPercent, isNull);
+    expect(result.pvgisRadiationDatabase, isNull);
+  });
+
+  test('trata base solar vazia como retrocompativel', () {
+    final result = PvgisValidationResult.fromMap({
+      'estimated_annual_generation': 6000,
+      'pvgis_annual_generation': 6200,
+      'monthly_generations': List<double>.filled(12, 500),
+      'monthly_hsp': List<double>.filled(12, 5.42),
+      'difference_percent': 3.33,
+      'latitude': -9.4,
+      'longitude': -38.2,
+      'location_source': 'client_address',
+      'location_label': 'Paulo Afonso, BA',
+      'pvgis_radiation_database': ' ',
+    });
+
+    expect(result.pvgisRadiationDatabase, isNull);
   });
 
   test('usa limite de revisao Solar Pro com fronteira inclusiva em 15%', () {

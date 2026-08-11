@@ -17,6 +17,7 @@ class PvgisValidationResult {
     this.pvAzimuth,
     this.pvgisAspect,
     this.pvgisSystemLossPercent,
+    this.pvgisRadiationDatabase,
   });
 
   final double estimatedAnnualGeneration;
@@ -35,6 +36,7 @@ class PvgisValidationResult {
   final double? pvAzimuth;
   final double? pvgisAspect;
   final double? pvgisSystemLossPercent;
+  final String? pvgisRadiationDatabase;
 
   double get absoluteDifferencePercent => differencePercent.abs();
   bool get isPvgisHigher => differencePercent > 0;
@@ -65,7 +67,14 @@ class PvgisValidationResult {
       pvAzimuth: _nullableDouble(map['pv_azimuth']),
       pvgisAspect: _nullableDouble(map['pvgis_aspect']),
       pvgisSystemLossPercent: _nullableDouble(map['pvgis_system_loss_percent']),
+      pvgisRadiationDatabase: _nullableString(map['pvgis_radiation_database']),
     );
+  }
+
+  static String? _nullableString(dynamic value) {
+    if (value == null) return null;
+    final raw = '$value'.trim();
+    return raw.isEmpty || raw == 'null' ? null : raw;
   }
 
   static double? _nullableDouble(dynamic value) {

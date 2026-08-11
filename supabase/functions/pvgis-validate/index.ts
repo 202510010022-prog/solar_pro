@@ -104,6 +104,7 @@ Deno.serve(async (request) => {
     const base = Math.max(estimatedAnnual, 1);
     const differencePercent = ((pvgisAnnual - estimatedAnnual) / base) * 100;
     const pvOrientation = extractPvOrientation(data);
+    const radiationDatabase = extractRadiationDatabase(data);
 
     return jsonResponse({
       ok: true,
@@ -113,6 +114,7 @@ Deno.serve(async (request) => {
       pv_azimuth: pvOrientation.azimuth,
       pvgis_aspect: pvOrientation.pvgisAspect,
       pvgis_system_loss_percent: loss,
+      pvgis_radiation_database: radiationDatabase,
       estimated_annual_generation: estimatedAnnual,
       pvgis_annual_generation: pvgisAnnual,
       monthly_generations: monthlyGenerations,
@@ -147,7 +149,7 @@ async function fetchPvgis(options: {
     optimalangles: "1",
     outputformat: "json",
   };
-  const databases = ["", "PVGIS-SARAH3", "PVGIS-NSRDB", "PVGIS-ERA5"];
+  const databases = ["", "PVGIS-SARAH3", "PVGIS-ERA5"];
   const errors: string[] = [];
 
   for (const database of databases) {
@@ -203,6 +205,13 @@ function extractPvOrientation(data: any) {
       ? null
       : pvgisAspectToGeographicAzimuth(pvgisAspect),
   };
+}
+
+function extractRadiationDatabase(data: any) {
+  const value = data?.inputs?.meteo_data?.radiation_db;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 }
 
 // PVGIS uses aspect/azimuth with 0=south, 90=west, -90=east.

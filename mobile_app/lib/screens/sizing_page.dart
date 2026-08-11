@@ -1155,6 +1155,17 @@ class _PvgisValidationCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (data?.pvgisRadiationDatabase != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Base solar: ${data!.pvgisRadiationDatabase}',
+                        style: const TextStyle(
+                          color: AppTheme.muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
