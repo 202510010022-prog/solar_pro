@@ -40,8 +40,11 @@ class SizingResult {
     final annual =
         normalizedGeneration.fold<double>(0, (sum, item) => sum + item);
     final monthly = annual / 12;
-    final savings = monthly * tariff;
-    final annualSavings = savings * 12;
+    final annualConsumptionTotal =
+        normalizedConsumption.fold<double>(0, (sum, item) => sum + item);
+    final annualSavings =
+        _compensableAnnualGeneration(annual, annualConsumptionTotal) * tariff;
+    final savings = annualSavings / 12;
 
     return SizingResult(
       averageConsumption: averageConsumption,
@@ -94,8 +97,10 @@ class SizingService {
     final annualGeneration =
         monthlyGenerations.fold<double>(0, (sum, item) => sum + item);
     final monthlyGeneration = annualGeneration / 12;
-    final monthlySavings = monthlyGeneration * tariff;
-    final annualSavings = monthlySavings * 12;
+    final annualSavings =
+        _compensableAnnualGeneration(annualGeneration, annualConsumption) *
+            tariff;
+    final monthlySavings = annualSavings / 12;
     final paybackYears =
         annualSavings <= 0 ? 0.0 : projectValue / annualSavings;
 
@@ -122,4 +127,14 @@ class SizingService {
 List<double> _normalizeList(List<double> values, int size) {
   if (values.length >= size) return values.take(size).toList();
   return [...values, ...List<double>.filled(size - values.length, 0)];
+}
+
+double _compensableAnnualGeneration(
+  double annualGeneration,
+  double annualConsumption,
+) {
+  if (annualGeneration <= 0 || annualConsumption <= 0) return 0;
+  return annualGeneration < annualConsumption
+      ? annualGeneration
+      : annualConsumption;
 }
