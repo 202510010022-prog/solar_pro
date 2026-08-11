@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:cross_file/cross_file.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'report_file_saver_stub.dart';
 
@@ -28,4 +28,16 @@ Future<SavedReport> saveReportBytes({
   );
 }
 
-Future<void> downloadSavedReport(SavedReport report) async {}
+Future<void> downloadSavedReport(SavedReport report) async {
+  final file = report.path == null ? null : File(report.path!);
+  if (file != null && !await file.exists()) {
+    throw Exception('Arquivo não encontrado para download.');
+  }
+
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [report.xFile],
+      fileNameOverrides: [report.fileName],
+    ),
+  );
+}
