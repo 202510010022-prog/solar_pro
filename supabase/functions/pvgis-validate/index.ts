@@ -100,7 +100,13 @@ Deno.serve(async (request) => {
       return jsonResponse({ error: "PVGIS retornou HSP médio diário incompleto." }, 502);
     }
 
-    const pvgisAnnual = monthlyGenerations.reduce((sum, value) => sum + value, 0);
+    const monthlyAverageDailyGenerations = extractMonthlyMetric(monthly, "E_d");
+    const monthlyPlaneIrradiations = extractMonthlyMetric(monthly, "H(i)_m");
+    const monthlyGenerationSd = extractMonthlyMetric(monthly, "SD_m");
+    const totals = extractPvgisTotals(data);
+    const monthlyAnnual = monthlyGenerations.reduce((sum, value) => sum + value, 0);
+    const pvgisAnnual = totals.annualGeneration ?? monthlyAnnual;
+    const pvgisAnnualSource = totals.annualGeneration === null ? "sum_E_m" : "E_y";
     const base = Math.max(estimatedAnnual, 1);
     const differencePercent = ((pvgisAnnual - estimatedAnnual) / base) * 100;
     const pvOrientation = extractPvOrientation(data);
@@ -117,8 +123,18 @@ Deno.serve(async (request) => {
       pvgis_radiation_database: radiationDatabase,
       estimated_annual_generation: estimatedAnnual,
       pvgis_annual_generation: pvgisAnnual,
+      pvgis_annual_generation_source: pvgisAnnualSource,
       monthly_generations: monthlyGenerations,
       monthly_hsp: monthlyHsp,
+      monthly_average_daily_generation_kwh: monthlyAverageDailyGenerations,
+      monthly_plane_irradiation_kwh_m2: monthlyPlaneIrradiations,
+      monthly_generation_sd_kwh: monthlyGenerationSd,
+      pvgis_annual_plane_irradiation_kwh_m2: totals.annualPlaneIrradiation,
+      pvgis_annual_generation_sd_kwh: totals.annualGenerationSd,
+      pvgis_l_aoi_percent: totals.lAoi,
+      pvgis_l_spec_percent: totals.lSpec,
+      pvgis_l_tg_percent: totals.lTg,
+      pvgis_l_total_percent: totals.lTotal,
       difference_percent: differencePercent,
       latitude,
       longitude,
@@ -212,6 +228,32 @@ function extractRadiationDatabase(data: any) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
+}
+
+function extractMonthlyMetric(monthly: any[], key: string) {
+  const values = monthly
+    .slice(0, 12)
+    .map((item) => finiteOrNull(toNumber(item?.[key])));
+  return values.every((value) => value !== null) ? values : [];
+}
+
+function extractPvgisTotals(data: any) {
+  const fixed = data?.outputs?.totals?.fixed;
+  const annualGeneration = positiveFiniteOrNull(toNumber(fixed?.E_y));
+
+  return {
+    annualGeneration,
+    annualPlaneIrradiation: finiteOrNull(toNumber(fixed?.["H(i)_y"])),
+    annualGenerationSd: finiteOrNull(toNumber(fixed?.SD_y)),
+    lAoi: finiteOrNull(toNumber(fixed?.l_aoi)),
+    lSpec: finiteOrNull(toNumber(fixed?.l_spec)),
+    lTg: finiteOrNull(toNumber(fixed?.l_tg)),
+    lTotal: finiteOrNull(toNumber(fixed?.l_total)),
+  };
+}
+
+function positiveFiniteOrNull(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 // PVGIS uses aspect/azimuth with 0=south, 90=west, -90=east.
