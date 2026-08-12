@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
+import '../config/legal_config.dart';
 import '../models/app_profile.dart';
 import '../models/app_subscription.dart';
 import '../models/manual_payment.dart';
 import '../services/report_service.dart';
 import '../services/solarpro_repository.dart';
 import '../theme/app_theme.dart';
+import '../utils/legal_launcher.dart';
 import '../widgets/neon_card.dart';
+import 'legal_privacy_page.dart';
 import 'messages_page.dart';
 import 'team_users_page.dart';
 
@@ -173,6 +176,34 @@ class MorePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text('Legal e suporte',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              _ActionTile(
+                icon: Icons.privacy_tip_outlined,
+                title: 'Legal e Privacidade',
+                subtitle: 'Políticas, termos e solicitação de exclusão',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => LegalPrivacyPage(profile: currentProfile),
+                  ),
+                ),
+              ),
+              _ActionTile(
+                icon: Icons.help_outline_rounded,
+                title: 'Ajuda e suporte',
+                subtitle: 'Dúvidas, privacidade e contato da equipe',
+                onTap: () => _openSupport(context),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        NeonCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               const Text('Atalhos futuros',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
               const SizedBox(height: 12),
@@ -180,12 +211,6 @@ class MorePage extends StatelessWidget {
                 icon: Icons.settings_outlined,
                 title: 'Configurações',
                 subtitle: 'Preferências, empresa e parâmetros padrão',
-                onTap: () => _comingSoon(context),
-              ),
-              _ActionTile(
-                icon: Icons.help_outline_rounded,
-                title: 'Ajuda e suporte',
-                subtitle: 'Dúvidas rápidas e contato da equipe',
                 onTap: () => _comingSoon(context),
               ),
               _ActionTile(
@@ -205,6 +230,15 @@ class MorePage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _openSupport(BuildContext context) async {
+    final opened = await openExternalUri(Uri.parse(LegalConfig.supportUrl));
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível abrir este link.')),
+      );
+    }
   }
 
   Future<void> _openFeedbackDialog(BuildContext context) async {

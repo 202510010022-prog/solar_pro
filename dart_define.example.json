@@ -1,4 +1,5 @@
 {
   "SUPABASE_URL": "https://SEU_PROJETO.supabase.co",
-  "SUPABASE_ANON_KEY": "SUA_CHAVE_PUBLISHABLE_AQUI"
+  "SUPABASE_ANON_KEY": "SUA_CHAVE_PUBLISHABLE_AQUI",
+  "LEGAL_BASE_URL": "https://solarpro.app"
 }
