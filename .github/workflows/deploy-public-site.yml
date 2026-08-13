@@ -1,13 +1,13 @@
-name: Deploy public site to GitHub Pages
+name: Deploy public site and Flutter Web to GitHub Pages
 
 on:
   push:
     branches:
       - master
     paths:
-      - public_site/**
-      - mobile_app/**
-      - .github/workflows/deploy-public-site.yml
+      - "public_site/**"
+      - "mobile_app/**"
+      - ".github/workflows/deploy-public-site.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,18 +16,20 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
+  group: "pages"
   cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -67,7 +69,7 @@ jobs:
           cp -R mobile_app/build/web/. pages_dist/app/
           touch pages_dist/.nojekyll
 
-      - name: Configure Pages
+      - name: Setup Pages
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
