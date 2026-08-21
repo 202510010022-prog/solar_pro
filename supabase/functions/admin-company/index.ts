@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 const allowedOrigins = [
   "https://solarpro.app",
   "https://admin.solarpro.app",
+  "https://202510010022-prog.github.io",
   "http://localhost:3000",
   "http://localhost:8081",
 ];
