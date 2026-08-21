@@ -1,4 +1,4 @@
-name: Deploy public site and Flutter Web to GitHub Pages
+name: Deploy public site and web app to GitHub Pages
 
 on:
   push:
@@ -31,25 +31,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Verify Supabase secrets
+      - name: Install Flutter dependencies
+        working-directory: mobile_app
+        run: flutter pub get
+
+      - name: Validate required secrets
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL secret" && exit 1)
-          test -n "$SUPABASE_ANON_KEY" || (echo "Missing SUPABASE_ANON_KEY secret" && exit 1)
+          test -n "$SUPABASE_URL" || (echo "SUPABASE_URL is missing" && exit 1)
+          test -n "$SUPABASE_ANON_KEY" || (echo "SUPABASE_ANON_KEY is missing" && exit 1)
 
-      - name: Install mobile_app dependencies
-        working-directory: mobile_app
-        run: flutter pub get
-
-      - name: Build mobile_app Flutter Web
+      - name: Build Flutter Web
         working-directory: mobile_app
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -61,21 +61,21 @@ jobs:
             --dart-define="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
             --dart-define="LEGAL_BASE_URL=https://202510010022-prog.github.io/solar_pro"
 
-      - name: Assemble GitHub Pages artifact
+      - name: Prepare Pages artifact
         run: |
-          rm -rf pages_dist
-          mkdir -p pages_dist/app
-          cp -R public_site/. pages_dist/
-          cp -R mobile_app/build/web/. pages_dist/app/
-          touch pages_dist/.nojekyll
+          rm -rf _site
+          mkdir -p _site/app
+          cp -R public_site/. _site/
+          cp -R mobile_app/build/web/. _site/app/
+          touch _site/.nojekyll
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload GitHub Pages artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: pages_dist
+          path: ./_site
 
       - name: Deploy to GitHub Pages
         id: deployment
