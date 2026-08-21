@@ -15,7 +15,7 @@ class LegalPrivacyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Legal e Privacidade')),
+      appBar: AppBar(title: const Text('Legal, FAQ e Privacidade')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -25,7 +25,7 @@ class LegalPrivacyPage extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Acesse políticas, termos, suporte e solicite análise de exclusão da sua conta.',
+            'Acesse políticas, termos, FAQ, suporte e solicite análise de exclusão da sua conta.',
             style: TextStyle(color: AppTheme.muted, height: 1.35),
           ),
           const SizedBox(height: 16),
@@ -55,10 +55,10 @@ class LegalPrivacyPage extends StatelessWidget {
                 ),
                 const Divider(height: 1, color: AppTheme.border),
                 _LegalTile(
-                  icon: Icons.support_agent_rounded,
-                  title: 'Ajuda e suporte',
-                  subtitle: 'Contato para dúvidas, privacidade e suporte',
-                  onTap: () => _openUrl(context, LegalConfig.supportUrl),
+                  icon: Icons.quiz_outlined,
+                  title: 'FAQ e suporte',
+                  subtitle: 'Perguntas frequentes, privacidade e suporte',
+                  onTap: () => _openUrl(context, LegalConfig.faqUrl),
                 ),
               ],
             ),

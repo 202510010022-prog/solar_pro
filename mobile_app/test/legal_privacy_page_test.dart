@@ -8,11 +8,11 @@ void main() {
       const MaterialApp(home: LegalPrivacyPage(profile: null)),
     );
 
-    expect(find.text('Legal e Privacidade'), findsOneWidget);
+    expect(find.text('Legal, FAQ e Privacidade'), findsOneWidget);
     expect(find.text('Política de Privacidade'), findsOneWidget);
     expect(find.text('Termos de Uso'), findsOneWidget);
     expect(find.text('Excluir minha conta e dados'), findsOneWidget);
-    expect(find.text('Ajuda e suporte'), findsOneWidget);
+    expect(find.text('FAQ e suporte'), findsOneWidget);
   });
 
   test('deletion email body includes only safe profile fields', () {

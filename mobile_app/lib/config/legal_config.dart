@@ -9,6 +9,7 @@ class LegalConfig {
   static String get privacyUrl => '$baseUrl/privacy.html';
   static String get termsUrl => '$baseUrl/terms.html';
   static String get dataDeletionUrl => '$baseUrl/data-deletion.html';
+  static String get faqUrl => '$baseUrl/support.html';
   static String get supportUrl => '$baseUrl/support.html';
 }
 

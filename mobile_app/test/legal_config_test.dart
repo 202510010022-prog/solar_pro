@@ -20,6 +20,7 @@ void main() {
       LegalConfig.dataDeletionUrl,
       'https://solarpro.app/data-deletion.html',
     );
+    expect(LegalConfig.faqUrl, 'https://solarpro.app/support.html');
     expect(LegalConfig.supportUrl, 'https://solarpro.app/support.html');
   });
 }

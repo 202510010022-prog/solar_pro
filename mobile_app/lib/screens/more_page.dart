@@ -181,8 +181,8 @@ class MorePage extends StatelessWidget {
               const SizedBox(height: 12),
               _ActionTile(
                 icon: Icons.privacy_tip_outlined,
-                title: 'Legal e Privacidade',
-                subtitle: 'Políticas, termos e solicitação de exclusão',
+                title: 'Legal, FAQ e Privacidade',
+                subtitle: 'Políticas, termos, FAQ e solicitação de exclusão',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -191,9 +191,9 @@ class MorePage extends StatelessWidget {
                 ),
               ),
               _ActionTile(
-                icon: Icons.help_outline_rounded,
-                title: 'Ajuda e suporte',
-                subtitle: 'Dúvidas, privacidade e contato da equipe',
+                icon: Icons.quiz_outlined,
+                title: 'FAQ e suporte',
+                subtitle: 'Perguntas frequentes, privacidade e contato',
                 onTap: () => _openSupport(context),
               ),
             ],
@@ -233,7 +233,7 @@ class MorePage extends StatelessWidget {
   }
 
   Future<void> _openSupport(BuildContext context) async {
-    final opened = await openExternalUri(Uri.parse(LegalConfig.supportUrl));
+    final opened = await openExternalUri(Uri.parse(LegalConfig.faqUrl));
     if (!opened && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Não foi possível abrir este link.')),
