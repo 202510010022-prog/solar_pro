@@ -22,20 +22,31 @@ class MessagesSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Mensagens e comunicados',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                  ),
-                ),
-                FilledButton.icon(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 560;
+                final title = const Text(
+                  'Mensagens e comunicados',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                );
+                final button = FilledButton.icon(
                   onPressed: onCreateMessage,
                   icon: const Icon(Icons.campaign_rounded),
                   label: const Text('Novo comunicado'),
-                ),
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 12), button],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    button,
+                  ],
+                );
+              },
             ),
           ),
           MessageTable(messages: messages),

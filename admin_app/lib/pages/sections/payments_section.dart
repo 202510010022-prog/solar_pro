@@ -26,20 +26,31 @@ class PaymentsSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Cobranças Pix',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                  ),
-                ),
-                FilledButton.icon(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 520;
+                final title = const Text(
+                  'Cobranças Pix',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                );
+                final button = FilledButton.icon(
                   onPressed: onCreatePayment,
                   icon: const Icon(Icons.pix_rounded),
                   label: const Text('Nova cobrança'),
-                ),
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 12), button],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    button,
+                  ],
+                );
+              },
             ),
           ),
           PaymentTable(payments: payments, onPaid: onPaid, onCancel: onCancel),

@@ -27,25 +27,33 @@ class CompaniesSection extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Empresas cadastradas',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 560;
+                final title = const Text(
+                  'Empresas cadastradas',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                );
+                final search = TextField(
+                  onChanged: onQueryChanged,
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar empresa...',
+                    prefixIcon: Icon(Icons.search_rounded),
                   ),
-                ),
-                SizedBox(
-                  width: 320,
-                  child: TextField(
-                    onChanged: onQueryChanged,
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar empresa...',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                ),
-              ],
+                );
+                if (compact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [title, const SizedBox(height: 12), search],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    SizedBox(width: 320, child: search),
+                  ],
+                );
+              },
             ),
           ),
           CompanyTable(companies: companies, plans: plans, onEdit: onEdit),

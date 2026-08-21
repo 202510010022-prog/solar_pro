@@ -88,101 +88,134 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AdminTheme.background,
-              Color(0xFF06101F),
-              Color(0xFF071A33),
-            ],
-          ),
-        ),
-        child: Row(
-          children: [
-            AdminSidebar(
-              section: section,
-              onSelect: (value) => setState(() => section = value),
-            ),
-            Expanded(
-              child: FutureBuilder<AdminData>(
-                future: future,
-                builder: (context, snapshot) {
-                  final data = snapshot.data;
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      data == null) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return AdminError(
-                      message: '${snapshot.error}'.replaceFirst(
-                        'Bad state: ',
-                        '',
-                      ),
-                      onRetry: reload,
-                      onLogout: logout,
-                    );
-                  }
-                  final companies = data?.companies ?? const <AdminCompany>[];
-                  final plans = data?.plans ?? const <AdminPlan>[];
-                  final payments = data?.payments ?? const <AdminPayment>[];
-                  final feedbacks = data?.feedbacks ?? const <AdminFeedback>[];
-                  final messages = data?.messages ?? const <AdminMessage>[];
-                  final users = data?.users ?? const <AdminUser>[];
-                  final filtered = companies.where((company) {
-                    final needle = query.trim().toLowerCase();
-                    if (needle.isEmpty) return true;
-                    return company.name.toLowerCase().contains(needle) ||
-                        company.billingEmail.toLowerCase().contains(needle) ||
-                        company.document.toLowerCase().contains(needle);
-                  }).toList();
-
-                  return CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: AdminHeader(
-                            section: section,
-                            onLogout: logout,
-                            onRefresh: reload,
-                            onCreate: () => _openCreateCompany(plans),
-                            onCreatePayment: () =>
-                                _openCreatePayment(companies),
-                            onCreateMessage: () =>
-                                _openCreateMessage(companies),
-                            onCreateUser: () => _openCreateUser(
-                              companies,
-                              initialCompanyId: selectedUsersCompanyId,
-                            ),
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.all(28),
-                        sliver: SliverList.list(
-                          children: _sectionContent(
-                            companies: companies,
-                            filteredCompanies: filtered,
-                            plans: plans,
-                            payments: payments,
-                            feedbacks: feedbacks,
-                            messages: messages,
-                            users: users,
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 860;
+        final pagePadding = compact ? 14.0 : 28.0;
+        return Scaffold(
+          drawer: compact
+              ? Drawer(
+                  backgroundColor: Colors.transparent,
+                  child: AdminSidebar(
+                    section: section,
+                    onSelect: (value) {
+                      Navigator.of(context).pop();
+                      setState(() => section = value);
+                    },
+                  ),
+                )
+              : null,
+          body: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AdminTheme.background,
+                  Color(0xFF06101F),
+                  Color(0xFF071A33),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
+            child: Row(
+              children: [
+                if (!compact)
+                  AdminSidebar(
+                    section: section,
+                    onSelect: (value) => setState(() => section = value),
+                  ),
+                Expanded(
+                  child: FutureBuilder<AdminData>(
+                    future: future,
+                    builder: (context, snapshot) {
+                      final data = snapshot.data;
+                      if (snapshot.connectionState == ConnectionState.waiting &&
+                          data == null) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return AdminError(
+                          message: '${snapshot.error}'.replaceFirst(
+                            'Bad state: ',
+                            '',
+                          ),
+                          onRetry: reload,
+                          onLogout: logout,
+                        );
+                      }
+                      final companies =
+                          data?.companies ?? const <AdminCompany>[];
+                      final plans = data?.plans ?? const <AdminPlan>[];
+                      final payments = data?.payments ?? const <AdminPayment>[];
+                      final feedbacks =
+                          data?.feedbacks ?? const <AdminFeedback>[];
+                      final messages = data?.messages ?? const <AdminMessage>[];
+                      final users = data?.users ?? const <AdminUser>[];
+                      final filtered = companies.where((company) {
+                        final needle = query.trim().toLowerCase();
+                        if (needle.isEmpty) return true;
+                        return company.name.toLowerCase().contains(needle) ||
+                            company.billingEmail.toLowerCase().contains(
+                              needle,
+                            ) ||
+                            company.document.toLowerCase().contains(needle);
+                      }).toList();
+
+                      return CustomScrollView(
+                        slivers: [
+                          SliverPadding(
+                            padding: EdgeInsets.fromLTRB(
+                              pagePadding,
+                              compact ? 14 : 24,
+                              pagePadding,
+                              0,
+                            ),
+                            sliver: SliverToBoxAdapter(
+                              child: Builder(
+                                builder: (context) => AdminHeader(
+                                  section: section,
+                                  onOpenMenu: compact
+                                      ? () => Scaffold.of(context).openDrawer()
+                                      : null,
+                                  onLogout: logout,
+                                  onRefresh: reload,
+                                  onCreate: () => _openCreateCompany(plans),
+                                  onCreatePayment: () =>
+                                      _openCreatePayment(companies),
+                                  onCreateMessage: () =>
+                                      _openCreateMessage(companies),
+                                  onCreateUser: () => _openCreateUser(
+                                    companies,
+                                    initialCompanyId: selectedUsersCompanyId,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: EdgeInsets.all(pagePadding),
+                            sliver: SliverList.list(
+                              children: _sectionContent(
+                                companies: companies,
+                                filteredCompanies: filtered,
+                                plans: plans,
+                                payments: payments,
+                                feedbacks: feedbacks,
+                                messages: messages,
+                                users: users,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

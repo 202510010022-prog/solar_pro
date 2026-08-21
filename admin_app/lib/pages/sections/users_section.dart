@@ -220,40 +220,56 @@ class _CompanyUsersDetail extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 620;
+                final title = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      company.name,
+                      maxLines: compact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${users.length} usuário(s) vinculados',
+                      style: const TextStyle(color: AdminTheme.muted),
+                    ),
+                  ],
+                );
+                final actions = Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onCreateUser,
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text('Novo usuário'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onEditCompany,
+                      icon: const Icon(Icons.edit_rounded),
+                      label: const Text('Editar empresa'),
+                    ),
+                  ],
+                );
+                if (compact) {
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        company.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        '${users.length} usuário(s) vinculados',
-                        style: const TextStyle(color: AdminTheme.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: onCreateUser,
-                  icon: const Icon(Icons.person_add_alt_1_rounded),
-                  label: const Text('Novo usuário'),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: onEditCompany,
-                  icon: const Icon(Icons.edit_rounded),
-                  label: const Text('Editar empresa'),
-                ),
-              ],
+                    children: [title, const SizedBox(height: 12), actions],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: title),
+                    actions,
+                  ],
+                );
+              },
             ),
           ),
           Padding(
@@ -297,7 +313,11 @@ class _CompanyInfoGrid extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 850 ? 4 : 2;
+        final columns = constraints.maxWidth >= 850
+            ? 4
+            : constraints.maxWidth >= 560
+            ? 2
+            : 1;
         final width = (constraints.maxWidth - ((columns - 1) * 10)) / columns;
         return Wrap(
           spacing: 10,
